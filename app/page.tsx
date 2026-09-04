@@ -21,49 +21,32 @@ interface ScheduledServiceItem {
   duties: { role: string; assignedTo: string }[];
 }
 
-function formatGoogleDriveUrl(url: string) {
+function formatDriveUrl(url: string) {
   if (!url) return "";
   if (url.includes("drive.google.com")) {
-    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-    if (fileIdMatch && fileIdMatch[1]) {
-      return `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
-    }
+    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) return `https://drive.google.com/uc?export=view&id=${match[1]}`;
   }
   return url;
 }
 
-function getYouTubeEmbedUrl(url: string) {
-  if (!url) return null;
-  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-  if (ytMatch && ytMatch[1]) {
-    return `https://www.youtube.com/embed/${ytMatch[1]}`;
-  }
-  return null;
-}
-
-export default function ChurchHome() {
+export default function ChurchBespokeHome() {
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [nextService, setNextService] = useState<ScheduledServiceItem | null>(null);
   const [banner, setBanner] = useState("");
+  const [activeTab, setActiveTab] = useState<"services" | "events" | "roster">("services");
 
   useEffect(() => {
-    // 1. Fetch Events
     const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents !== null) {
+    if (savedEvents) {
       try {
         setEvents(JSON.parse(savedEvents));
       } catch (e) {}
     }
 
-    // 2. Fetch Active Banner
     const savedBanner = localStorage.getItem("church_banner");
-    if (savedBanner) {
-      setBanner(savedBanner);
-    } else {
-      setBanner("");
-    }
+    if (savedBanner) setBanner(savedBanner);
 
-    // 3. Find Nearest Upcoming Worship Service
     const savedMulti = localStorage.getItem("church_multi_schedules");
     if (savedMulti) {
       try {
@@ -71,313 +54,282 @@ export default function ChurchHome() {
         const now = new Date();
         const future = list.filter((item) => {
           if (!item.date) return false;
-          const endOfDay = new Date(item.date);
-          endOfDay.setHours(23, 59, 59, 999);
-          return now.getTime() <= endOfDay.getTime();
+          const end = new Date(item.date);
+          end.setHours(23, 59, 59, 999);
+          return now.getTime() <= end.getTime();
         });
-
         future.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        if (future.length > 0) {
-          setNextService(future[0]);
-        }
+        if (future.length > 0) setNextService(future[0]);
       } catch (e) {}
     }
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-200 selection:text-blue-900">
-      {/* 1. TOP ANNOUNCEMENT BANNER */}
+    <div className="min-h-screen bg-[#070B14] text-slate-100 font-sans selection:bg-amber-400 selection:text-slate-950 relative overflow-hidden">
+      {/* AMBIENT SANCTUARY GLOWS */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-blue-600/15 via-indigo-500/5 to-transparent blur-[140px] pointer-events-none" />
+      <div className="absolute top-[600px] right-0 w-[400px] h-[400px] bg-amber-500/5 blur-[120px] pointer-events-none" />
+
+      {/* TOP LITURGICAL TICKER */}
       {banner && (
-        <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
-          <span className="inline-flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
+        <div className="bg-gradient-to-r from-amber-600/30 via-amber-500/20 to-amber-600/30 border-b border-amber-500/30 text-amber-200 text-xs py-2 px-4 text-center font-medium backdrop-blur-md">
+          <span className="inline-flex items-center gap-2 tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
             {banner}
           </span>
         </div>
       )}
 
-      {/* 2. HEADER */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
+      {/* FLOATING GLASS HEADER */}
+      <header className="sticky top-4 z-50 max-w-6xl mx-auto px-4">
+        <div className="bg-slate-900/70 backdrop-blur-2xl border border-white/10 rounded-2xl px-5 h-16 flex items-center justify-between shadow-2xl shadow-black/60">
           <Link href="/" className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white text-lg shadow-md shadow-blue-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center text-white font-bold text-base shadow-lg shadow-blue-500/20 border border-white/20">
               ✝
             </div>
             <div>
-              <span className="block text-base sm:text-lg font-bold tracking-tight text-slate-900">
-                Tubod Seventh-day Adventist
-              </span>
-              <span className="block text-[11px] font-semibold text-blue-600 tracking-wider uppercase">
-                Leyte, Philippines
-              </span>
+              <span className="text-sm font-black tracking-tight text-white block">Tubod SDA Church</span>
+              <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider block">Leyte • Sanctuary</span>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-            <a href="#services" className="hover:text-blue-600 transition-colors">Worship & Roster</a>
-            <a href="#events" className="hover:text-blue-600 transition-colors">Events & Highlights</a>
-            <a href="#community" className="hover:text-blue-600 transition-colors">Membership</a>
+          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-300">
+            <a href="#sanctuary" className="hover:text-amber-300 transition-colors">Sanctuary Hours</a>
+            <Link href="/schedule" className="hover:text-amber-300 transition-colors flex items-center gap-1">
+              <span>📜</span> Official Roster
+            </Link>
+            <a href="#highlights" className="hover:text-amber-300 transition-colors">Fellowship Highlights</a>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link
               href="/register"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-xs hover:shadow-md hover:shadow-blue-600/20 active:scale-95"
+              className="bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition shadow-lg shadow-amber-500/20 active:scale-95"
             >
-              Member Registration
+              Member Portal
             </Link>
           </div>
         </div>
       </header>
 
-      {/* 3. HERO */}
-      <section className="relative overflow-hidden pt-16 pb-20 px-4 text-center bg-gradient-to-b from-blue-100/60 via-blue-50/40 to-slate-50">
-        <div className="max-w-4xl mx-auto space-y-6 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-blue-200 bg-white text-blue-700 text-xs font-semibold shadow-xs">
-            <span>✨</span> Welcome to Our Sanctuary & Online Fellowship
-          </div>
+      {/* BESPOKE HERO SECTION */}
+      <section className="pt-24 pb-16 px-4 text-center max-w-4xl mx-auto space-y-6 relative z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-300 text-xs font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" /> Seventh-day Adventist Sanctuary Fellowship
+        </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 leading-tight">
-            Proclaiming the Blessed Hope, <br className="hidden sm:inline" />
-            <span className="text-blue-600">
-              Walking in Christ Jesus.
-            </span>
-          </h1>
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white leading-[1.08]">
+          Keeping the Faith, <br />
+          <span className="bg-gradient-to-r from-amber-200 via-blue-200 to-indigo-300 bg-clip-text text-transparent">
+            Honoring His Sabbath.
+          </span>
+        </h1>
 
-          <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
-            A Bible-believing family committed to Sabbath worship, Gospel truth, Christian fellowship, and loving service across Tubod.
-          </p>
+        <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
+          A Bible-grounded congregation worshiping in spirit, truth, and community across Tubod, Leyte.
+        </p>
 
-          <div className="flex flex-wrap justify-center gap-3 pt-2">
+        {/* HERO INTERACTION BUTTONS */}
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
+          <Link
+            href="/schedule"
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-2 active:scale-95"
+          >
+            <span>📖</span> View Active Roster
+          </Link>
+          <a
+            href="#sanctuary"
+            className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-white font-medium text-xs px-5 py-3 rounded-xl transition backdrop-blur-md"
+          >
+            Worship Times & Map
+          </a>
+        </div>
+      </section>
+
+      {/* SHOWCASE SANCTUARY SERVICE PORTAL */}
+      <section className="max-w-5xl mx-auto px-4 mb-16 relative z-10">
+        <div className="bg-gradient-to-b from-slate-900/90 to-slate-950/90 border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* SERVICE ANNOUNCER HEADER */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6 mb-6">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-0.5 rounded-md inline-block">
+                Liturgical Calendar
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                {nextService ? nextService.serviceType : "Sabbath School & Divine Service"}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {nextService?.date ? new Date(nextService.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "This Sabbath"} • {nextService?.time || "8:30 AM & 10:30 AM"}
+              </p>
+            </div>
+
             <Link
               href="/schedule"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
+              className="bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition text-center shrink-0"
             >
-              <span>📋</span> View Weekly Worship Schedule
+              Open Printable Board &rarr;
             </Link>
-            <a
-              href="#services"
-              className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold px-6 py-3 rounded-xl text-sm transition-all shadow-xs"
-            >
-              Worship Hours
-            </a>
+          </div>
+
+          {/* REALTIME ROSTER BADGE GRID */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {(nextService?.duties && nextService.duties.length > 0
+              ? nextService.duties
+              : [
+                  { role: "Platform Elder", assignedTo: "Church Officer" },
+                  { role: "Divine Preacher", assignedTo: "Pastor / Elder" },
+                  { role: "SS Superintendent", assignedTo: "Leader" },
+                  { role: "Lesson Study Teacher", assignedTo: "Appointed Elder" },
+                ]
+            ).slice(0, 8).map((d, idx) => (
+              <div
+                key={idx}
+                className="bg-white/[0.03] border border-white/[0.06] hover:border-blue-500/40 p-3 rounded-2xl transition duration-200"
+              >
+                <span className="text-[10px] font-semibold text-slate-400 block truncate">{d.role}</span>
+                <span className="text-xs font-bold text-white mt-1 block truncate">
+                  {d.assignedTo || "—"}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 4. WORSHIP SCHEDULE & MEETING HOURS (PRIMARY POSITION) */}
-      <section id="services" className="py-8 px-4 max-w-6xl mx-auto w-full -mt-6 relative z-20 space-y-6">
-        {/* NEAREST LIVE SERVICE CARD */}
-        {nextService && (
-          <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-blue-800">
-            <div className="space-y-2">
-              <span className="inline-block bg-amber-400 text-amber-950 font-black text-[10px] uppercase px-2.5 py-1 rounded-full tracking-wider">
-                ⚡ Next Upcoming Worship
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black">{nextService.serviceType}</h2>
-              <p className="text-xs sm:text-sm text-blue-200">
-                {new Date(nextService.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })} • {nextService.time}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/schedule"
-                className="bg-white text-blue-900 hover:bg-blue-50 font-bold px-5 py-2.5 rounded-xl text-xs transition-all shadow-md flex items-center gap-2"
-              >
-                <span>📋</span> View Duty Assignments &rarr;
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* REGULAR SERVICE HOURS & SANCTUARY LOCATION */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-xs">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 text-xl">
-                ⏳
-              </span>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Sabbath Gathering Hours</h2>
-                <p className="text-xs text-slate-500">Regular weekly service appointments</p>
-              </div>
-            </div>
-            <div className="space-y-3 text-sm divide-y divide-slate-100">
-              <div className="pt-2 flex justify-between">
-                <span className="text-slate-500 font-medium">Sabbath School</span>
-                <span className="font-semibold text-slate-800">Saturday 8:30 AM</span>
-              </div>
-              <div className="pt-3 flex justify-between">
-                <span className="text-slate-500 font-medium">Divine Worship</span>
-                <span className="font-bold text-blue-600">Saturday 10:30 AM</span>
-              </div>
-              <div className="pt-3 flex justify-between">
-                <span className="text-slate-500 font-medium">Adventist Youth (AY)</span>
-                <span className="font-semibold text-slate-800">Saturday 3:30 PM</span>
-              </div>
-              <div className="pt-3 flex justify-between">
-                <span className="text-slate-500 font-medium">Midweek Prayer</span>
-                <span className="font-semibold text-slate-800">Wednesday 6:30 PM</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-5">
-                <span className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 text-xl">
-                  📍
-                </span>
+      {/* BESPOKE WORSHIP GATHERINGS & DIRECTIONS */}
+      <section id="sanctuary" className="max-w-5xl mx-auto px-4 mb-20 space-y-6">
+        <div className="grid sm:grid-cols-2 gap-5">
+          {/* APPOINTED GATHERING TIMES */}
+          <div className="bg-slate-900/50 border border-white/5 rounded-3xl p-7 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-center justify-center font-bold">
+                  ⌛
+                </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Sanctuary Location</h2>
-                  <p className="text-xs text-slate-500">Gather with us in fellowship</p>
+                  <h3 className="text-base font-bold text-white">Sanctuary Schedule</h3>
+                  <p className="text-xs text-slate-400">Recurring meeting times</p>
                 </div>
               </div>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                Tubod Seventh-day Adventist Church Sanctuary, Tubod, Leyte, Philippines. All guests, visitors, and members are warmly welcome.
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between p-2.5 rounded-xl bg-white/[0.02]">
+                  <span className="text-slate-400">Sabbath Morning Bible Study</span>
+                  <span className="font-bold text-white">Saturday 8:30 AM</span>
+                </div>
+                <div className="flex justify-between p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <span className="text-blue-300 font-semibold">Divine Worship Hour</span>
+                  <span className="font-black text-amber-300">Saturday 10:30 AM</span>
+                </div>
+                <div className="flex justify-between p-2.5 rounded-xl bg-white/[0.02]">
+                  <span className="text-slate-400">Adventist Youth (AY)</span>
+                  <span className="font-bold text-white">Saturday 3:30 PM</span>
+                </div>
+                <div className="flex justify-between p-2.5 rounded-xl bg-white/[0.02]">
+                  <span className="text-slate-400">Midweek Prayer Gathering</span>
+                  <span className="font-bold text-white">Wednesday 6:30 PM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SANCTUARY LOCATION CARD */}
+          <div className="bg-slate-900/50 border border-white/5 rounded-3xl p-7 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                  📍
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Sanctuary Location</h3>
+                  <p className="text-xs text-slate-400">Tubod, Leyte, Philippines</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed bg-white/[0.02] p-4 rounded-xl border border-white/[0.04]">
+                Our sanctuary gates welcome everyone—visitors, traveling members, and families looking for peace, truth, and community fellowship.
               </p>
             </div>
-            <div className="pt-5 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer transition-colors">
-                Open Directions in Google Maps &rarr;
+
+            <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+              <a
+                href="https://maps.google.com/?q=Tubod+Seventh-day+Adventist+Church+Leyte"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-amber-300 hover:text-amber-200 transition-colors flex items-center gap-1.5"
+              >
+                <span>🗺️</span> Open Google Maps &rarr;
+              </a>
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                Open Every Sabbath
               </span>
-              <Link href="/schedule" className="text-xs font-bold text-slate-600 hover:text-blue-600">
-                Full Duty Roster &rarr;
-              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5. EVENTS & PHOTO/VIDEO HIGHLIGHTS (FOLLOWS THE SERVICES) */}
-      <section id="events" className="py-12 px-4 max-w-6xl mx-auto w-full">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-3 border-b border-slate-200/80 pb-4">
+      {/* BESPOKE EVENTS & MEDIA HIGHLIGHTS */}
+      <section id="highlights" className="max-w-6xl mx-auto px-4 mb-24">
+        <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-8">
           <div>
-            <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">Memories & Gatherings</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Events & Highlights</h2>
+            <span className="text-[10px] uppercase font-bold text-blue-400 tracking-widest">Congregation Memories</span>
+            <h2 className="text-2xl sm:text-3xl font-black text-white">Events & Photo Gallery</h2>
           </div>
-          <Link href="/admin" className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">
-            Upload / Manage &rarr;
+          <Link href="/admin" className="text-xs text-slate-400 hover:text-white transition">
+            Admin Portal &rarr;
           </Link>
         </div>
 
         {events.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500 text-xs">
-            No highlights or events posted right now. New photos will appear here when added in the Admin Portal.
+          <div className="p-12 text-center bg-white/[0.02] border border-white/5 rounded-3xl text-xs text-slate-500">
+            No memories posted currently. Add event photo or video links inside Admin.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((ev) => {
-              const ytEmbed = ev.videoUrl ? getYouTubeEmbedUrl(ev.videoUrl) : null;
-              const photoUrl = ev.mediaUrl ? formatGoogleDriveUrl(ev.mediaUrl) : null;
-
-              return (
-                <div
-                  key={ev.id}
-                  className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
-                >
-                  {ytEmbed ? (
-                    <div className="relative aspect-video w-full bg-black">
-                      <iframe
-                        src={ytEmbed}
-                        title={ev.title}
-                        className="w-full h-full border-0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : photoUrl ? (
-                    <div className="relative h-48 w-full overflow-hidden bg-slate-100">
-                      <img
-                        src={photoUrl}
-                        alt={ev.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : ev.videoUrl ? (
-                    <div className="h-44 bg-blue-900 text-white flex flex-col items-center justify-center p-4 text-center">
-                      <span className="text-2xl mb-1">▶️</span>
-                      <a
-                        href={ev.videoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-bold underline hover:text-blue-200"
-                      >
-                        Watch Video on Facebook / External &rarr;
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="h-40 bg-blue-50/50 flex items-center justify-center text-blue-400 text-xs font-medium">
-                      Tubod SDA Sanctuary
-                    </div>
-                  )}
-
-                  <div className="p-5 flex-1 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[11px] font-bold text-blue-600 tracking-wide uppercase">{ev.date}</span>
-                      <h3 className="text-base font-bold text-slate-900 mt-1 group-hover:text-blue-600 transition-colors">
-                        {ev.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-2 leading-relaxed">{ev.desc}</p>
-                    </div>
-
-                    {ev.videoUrl && !ytEmbed && (
-                      <div className="pt-3 mt-3 border-t border-slate-100">
-                        <a
-                          href={ev.videoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                        >
-                          <span>🔗</span> Open Video Link &rarr;
-                        </a>
-                      </div>
-                    )}
+            {events.map((ev) => (
+              <div
+                key={ev.id}
+                className="bg-slate-900/60 border border-white/10 rounded-2xl overflow-hidden hover:border-amber-400/40 transition duration-300 flex flex-col justify-between group"
+              >
+                {ev.mediaUrl ? (
+                  <div className="h-48 overflow-hidden bg-black/40">
+                    <img
+                      src={formatDriveUrl(ev.mediaUrl)}
+                      alt={ev.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-40 bg-gradient-to-br from-slate-950 to-blue-950 flex items-center justify-center text-slate-600 text-xs">
+                    Tubod SDA Sanctuary
+                  </div>
+                )}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">{ev.date}</span>
+                    <h4 className="text-sm font-bold text-white mt-1 group-hover:text-amber-200 transition-colors">
+                      {ev.title}
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">{ev.desc}</p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </section>
 
-      {/* 6. MEMBER REGISTRATION BANNER */}
-      <section id="community" className="py-14 px-4 bg-white border-y border-slate-200/80 my-8">
-        <div className="max-w-3xl mx-auto text-center space-y-4">
-          <span className="inline-block p-3 rounded-2xl bg-blue-50 text-blue-600 text-2xl">
-            👥
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Join the Church Fellowship Directory</h2>
-          <p className="text-slate-600 text-sm max-w-lg mx-auto">
-            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service rosters and announcements.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/register"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-6 py-3 rounded-xl transition-all inline-block shadow-xs hover:shadow-md hover:shadow-blue-600/20"
-            >
-              Register Membership &rarr;
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. FOOTER */}
-      <footer className="mt-auto bg-white border-t border-slate-200 py-8 px-4 text-center text-xs text-slate-500">
-        <p>&copy; {new Date().getFullYear()} Tubod Seventh-day Adventist Church. All rights reserved.</p>
+      {/* FOOTER */}
+      <footer className="border-t border-white/10 bg-black/50 py-10 px-4 text-center text-xs text-slate-500">
+        <p>&copy; {new Date().getFullYear()} Tubod Seventh-day Adventist Church • Leyte, Philippines</p>
         <div className="mt-3 flex justify-center gap-4 text-[11px]">
-          <Link href="/schedule" className="text-slate-600 hover:text-blue-600 transition-colors">
-            Worship Schedule
-          </Link>
-          <span className="text-slate-300">•</span>
-          <Link href="/register" className="text-slate-600 hover:text-blue-600 transition-colors">
-            Member Register
-          </Link>
-          <span className="text-slate-300">•</span>
-          <Link href="/admin" className="text-slate-400 hover:text-slate-600 transition-colors">
-            Admin Portal
-          </Link>
+          <Link href="/schedule" className="hover:text-slate-300">Worship Roster</Link>
+          <span>•</span>
+          <Link href="/register" className="hover:text-slate-300">Member Registry</Link>
+          <span>•</span>
+          <Link href="/admin" className="text-slate-600 hover:text-slate-400">Admin Portal</Link>
         </div>
       </footer>
     </div>
