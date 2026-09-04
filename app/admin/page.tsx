@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
 
 export interface ScheduledServiceItem {
@@ -17,7 +17,7 @@ interface ChurchEvent {
   title: string;
   date: string;
   desc: string;
-  mediaUrl?: string;
+  mediaUrl?: string; // Can be a local compressed base64 or Google Drive link
   videoUrl?: string;
 }
 
@@ -32,7 +32,6 @@ interface Member {
   status?: "pending" | "approved";
 }
 
-// Global notifier so all components and pages update instantly
 function broadcastDataChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("church_data_updated"));
@@ -100,7 +99,7 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"schedules" | "events" | "members" | "banner">("schedules");
+  const [activeTab, setActiveTab] = useState<"schedules" | "events" | "members" | "banner">("events");
 
   const [schedules, setSchedules] = useState<ScheduledServiceItem[]>([]);
   const [events, setEvents] = useState<ChurchEvent[]>([]);
@@ -118,19 +117,18 @@ export default function AdminDashboard() {
   const [eventTitle, setEventTitle] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventDesc, setEventDesc] = useState("");
-  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaUrl, setMediaUrl] = useState(""); // Google Drive link fallback
   const [videoUrl, setVideoUrl] = useState("");
+  const [eventPhotoPreview, setEventPhotoPreview] = useState(""); // Local uploaded photo
 
   useEffect(() => {
     let combinedList: ScheduledServiceItem[] = [];
-
     const savedSchedules = localStorage.getItem("church_multi_schedules");
     if (savedSchedules) {
       try {
         combinedList = JSON.parse(savedSchedules);
       } catch (e) {}
     }
-
     combinedList.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     setSchedules(combinedList);
 
@@ -168,14 +166,52 @@ export default function AdminDashboard() {
     setServiceDuties(SERVICE_TEMPLATES[newType].roles.map((r) => ({ role: r, assignedTo: "" })));
   };
 
-  // 1. ADD SCHEDULE (Broadcasts instantly to Home & Roster)
+  // Compress uploaded 4K device photos for events
+  const handleEventPhotoSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_SIZE = 900; // Crisp web resolution
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.8);
+          setEventPhotoPreview(compressed);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAddSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceDate) {
-      alert("Please select a date for this service.");
+      alert("Please select a date.");
       return;
     }
-
     const template = SERVICE_TEMPLATES[chosenType];
     const newService: ScheduledServiceItem = {
       id: Date.now().toString(),
@@ -188,42 +224,27 @@ export default function AdminDashboard() {
 
     const updated = [...schedules, newService];
     updated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
     setSchedules(updated);
     localStorage.setItem("church_multi_schedules", JSON.stringify(updated));
 
-    // Auto-update banner to nearest
     const top = updated[0];
-    const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - Please check the roster!`;
+    const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - Check roster!`;
     localStorage.setItem("church_banner", autoBanner);
     setBannerNotice(autoBanner);
 
     broadcastDataChange();
-    alert(`${chosenType} published and connected to live site!`);
+    alert(`${chosenType} published!`);
     setServiceDate("");
   };
 
-  // 2. DELETE SCHEDULE (Broadcasts instantly)
   const handleDeleteSchedule = (id: string) => {
-    if (!confirm("Delete this worship schedule?")) return;
+    if (!confirm("Delete schedule?")) return;
     const updated = schedules.filter((s) => s.id !== id);
     setSchedules(updated);
     localStorage.setItem("church_multi_schedules", JSON.stringify(updated));
-
-    if (updated.length > 0) {
-      const top = updated[0];
-      const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-      localStorage.setItem("church_banner", autoBanner);
-      setBannerNotice(autoBanner);
-    } else {
-      localStorage.removeItem("church_banner");
-      setBannerNotice("");
-    }
-
     broadcastDataChange();
   };
 
-  // 3. EDIT DUTY ROSTER NAME (Broadcasts live on every keystroke)
   const handleUpdateAssignedDuty = (scheduleId: string, dutyIdx: number, val: string) => {
     const updated = schedules.map((item) => {
       if (item.id === scheduleId) {
@@ -238,7 +259,7 @@ export default function AdminDashboard() {
     broadcastDataChange();
   };
 
-  // 4. ADD EVENT (Broadcasts to homepage grid)
+  // ADD EVENT WITH DEVICE UPLOAD SUPPORT
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle || !eventDesc) return;
@@ -248,7 +269,7 @@ export default function AdminDashboard() {
       title: eventTitle,
       date: eventDate || "Upcoming",
       desc: eventDesc,
-      mediaUrl: mediaUrl.trim(),
+      mediaUrl: eventPhotoPreview || mediaUrl.trim(), // Prioritize uploaded device photo
       videoUrl: videoUrl.trim(),
     };
 
@@ -262,10 +283,10 @@ export default function AdminDashboard() {
     setEventDesc("");
     setMediaUrl("");
     setVideoUrl("");
-    alert("Event published to homepage!");
+    setEventPhotoPreview("");
+    alert("Event published live on homepage!");
   };
 
-  // 5. DELETE EVENT (Broadcasts instantly)
   const handleDeleteEvent = (id: number) => {
     const updated = events.filter((item) => item.id !== id);
     setEvents(updated);
@@ -273,7 +294,6 @@ export default function AdminDashboard() {
     broadcastDataChange();
   };
 
-  // 6. MEMBER APPROVALS
   const handleApproveMember = (id: number) => {
     const updated = members.map((m) => (m.id === id ? { ...m, status: "approved" as const } : m));
     setMembers(updated);
@@ -282,7 +302,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeclineMember = (id: number) => {
-    if (confirm("Decline this registration?")) {
+    if (confirm("Decline registration?")) {
       const updated = members.filter((m) => m.id !== id);
       setMembers(updated);
       localStorage.setItem("church_members", JSON.stringify(updated));
@@ -298,7 +318,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteMember = (id: number) => {
-    if (confirm("Remove this member from directory?")) {
+    if (confirm("Remove member?")) {
       const updated = members.filter((m) => m.id !== id);
       setMembers(updated);
       localStorage.setItem("church_members", JSON.stringify(updated));
@@ -306,12 +326,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // 7. SAVE OR CLEAR BANNER (Broadcasts to top alert)
   const handleUpdateBanner = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("church_banner", bannerNotice);
     broadcastDataChange();
-    alert("Banner updated on all pages!");
+    alert("Banner updated!");
   };
 
   const pendingMembers = members.filter((m) => m.status === "pending");
@@ -324,7 +343,7 @@ export default function AdminDashboard() {
           <div className="text-center">
             <span className="text-3xl">🔐</span>
             <h1 className="text-xl font-bold text-slate-900 mt-2">Tubod SDA Admin Portal</h1>
-            <p className="text-xs text-slate-500">Enter PIN to manage live website</p>
+            <p className="text-xs text-slate-500">Enter PIN to manage website</p>
           </div>
           {error && <p className="text-xs text-red-600 bg-red-50 p-2 rounded text-center">{error}</p>}
           <input
@@ -351,7 +370,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-16">
-      {/* HEADER */}
       <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-3">
           <span className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded font-bold uppercase tracking-wider">Live Sync</span>
@@ -370,7 +388,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* TABS NAVIGATION */}
+      {/* TABS */}
       <div className="max-w-5xl mx-auto px-4 pt-6">
         <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-xs overflow-x-auto">
           <button
@@ -420,9 +438,7 @@ export default function AdminDashboard() {
             <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
               <div className="border-b pb-3 border-slate-100">
                 <h2 className="text-sm font-bold text-slate-900">+ Schedule a Worship Service</h2>
-                <p className="text-xs text-slate-500">Immediately changes the Next Service card on the homepage and updates <code>/schedule</code>.</p>
               </div>
-
               <form onSubmit={handleAddSchedule} className="space-y-4 text-xs">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
@@ -430,167 +446,170 @@ export default function AdminDashboard() {
                     <select
                       value={chosenType}
                       onChange={(e) => handleTypeChange(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 font-medium outline-none"
                     >
                       {Object.keys(SERVICE_TEMPLATES).map((key) => (
                         <option key={key} value={key}>{key}</option>
                       ))}
                     </select>
                   </div>
-
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Service Calendar Date *</label>
+                    <label className="block font-semibold text-slate-700 mb-1">Service Date *</label>
                     <input
                       type="date"
                       required
                       value={serviceDate}
                       onChange={(e) => setServiceDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 font-medium focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none cursor-pointer"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 font-medium outline-none"
                     />
                   </div>
                 </div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {serviceDuties.map((d, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <span className="w-40 font-semibold text-slate-600 truncate">{d.role}</span>
+                      <input
+                        type="text"
+                        placeholder="Name..."
+                        value={d.assignedTo}
+                        onChange={(e) => {
+                          const updated = [...serviceDuties];
+                          updated[index].assignedTo = e.target.value;
+                          setServiceDuties(updated);
+                        }}
+                        className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-xs outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-2.5 rounded-xl">
+                  + Publish Service
+                </button>
+              </form>
+            </section>
 
-                <div>
-                  <span className="block font-bold text-slate-800 mb-2 uppercase tracking-wider text-[11px]">
-                    Assign Duty Roles:
-                  </span>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    {serviceDuties.map((d, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                        <span className="w-40 font-semibold text-slate-600 truncate">{d.role}</span>
+            <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-sm font-bold text-slate-900">Active Rosters ({schedules.length})</h2>
+              {schedules.map((s, idx) => (
+                <div key={s.id} className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">{s.serviceType}</h4>
+                      <p className="text-xs text-slate-500">{s.date} • {s.time}</p>
+                    </div>
+                    <button onClick={() => handleDeleteSchedule(s.id)} className="text-xs text-rose-600 hover:bg-rose-100 px-3 py-1 rounded border border-rose-300 font-bold">
+                      Delete
+                    </button>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                    {s.duties.map((duty, dIdx) => (
+                      <div key={dIdx} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200">
+                        <span className="w-40 font-semibold text-slate-600 truncate">{duty.role}</span>
                         <input
                           type="text"
-                          placeholder="Type name..."
-                          value={d.assignedTo}
-                          onChange={(e) => {
-                            const updated = [...serviceDuties];
-                            updated[index].assignedTo = e.target.value;
-                            setServiceDuties(updated);
-                          }}
-                          className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold outline-none focus:ring-1 focus:ring-blue-600"
+                          value={duty.assignedTo}
+                          onChange={(e) => handleUpdateAssignedDuty(s.id, dIdx, e.target.value)}
+                          className="flex-1 bg-slate-50 border rounded px-2 py-1 text-xs"
                         />
                       </div>
                     ))}
                   </div>
                 </div>
-
-                <div>
-                  <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-2.5 rounded-xl shadow-xs transition">
-                    + Publish Service (Syncs Immediately)
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="border-b pb-3 border-slate-100">
-                <h2 className="text-sm font-bold text-slate-900">Active Scheduled Rosters ({schedules.length})</h2>
-                <p className="text-xs text-slate-500">Typing inside these boxes updates the live website automatically.</p>
-              </div>
-
-              {schedules.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-500">
-                  No worship services currently active. Use the form above to add one.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {schedules.map((s, idx) => (
-                    <div key={s.id} className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
-                      <div className="flex items-center justify-between border-b pb-2 border-slate-200">
-                        <div>
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                            idx === 0 ? "bg-amber-300 text-amber-950 font-black" : "bg-blue-100 text-blue-800"
-                          }`}>
-                            {idx === 0 ? "⚡ Shown on Homepage Centerpiece" : "Queued on Schedule Page"}
-                          </span>
-                          <h4 className="text-sm font-bold text-slate-900 mt-1">{s.serviceType}</h4>
-                          <p className="text-xs text-slate-500">{s.date} • {s.time}</p>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteSchedule(s.id)}
-                          className="text-xs text-rose-600 hover:bg-rose-100 bg-white border border-rose-300 px-3 py-1.5 rounded-lg font-bold transition"
-                        >
-                          Delete Service
-                        </button>
-                      </div>
-
-                      <div className="grid sm:grid-cols-2 gap-2 text-xs">
-                        {s.duties.map((duty, dIdx) => (
-                          <div key={dIdx} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200">
-                            <span className="w-40 font-semibold text-slate-600 truncate">{duty.role}</span>
-                            <input
-                              type="text"
-                              value={duty.assignedTo}
-                              onChange={(e) => handleUpdateAssignedDuty(s.id, dIdx, e.target.value)}
-                              className="flex-1 bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs font-semibold outline-none focus:bg-white focus:ring-1 focus:ring-blue-600"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              ))}
             </section>
           </div>
         )}
 
-        {/* TAB 2: EVENTS */}
+        {/* TAB 2: EVENTS (WITH DEVICE FILE UPLOADER & GOOGLE DRIVE SUPPORT) */}
         {activeTab === "events" && (
           <div className="space-y-6">
             <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
               <div className="border-b pb-3 border-slate-100">
                 <h2 className="text-sm font-bold text-slate-900">+ Post an Event or Video Highlight</h2>
-                <p className="text-xs text-slate-500">Instantly appears in the 4-card grid on the homepage.</p>
+                <p className="text-xs text-slate-500">Upload a 4K photo directly from your device or paste a Google Drive link.</p>
               </div>
 
-              <form onSubmit={handleAddEvent} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Event Title *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Youth Fellowship & Music"
-                    value={eventTitle}
-                    onChange={(e) => setEventTitle(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
-                  />
+              <form onSubmit={handleAddEvent} className="space-y-4 text-xs">
+                {/* DEVICE FILE UPLOAD & PREVIEW */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="w-24 h-24 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center shrink-0">
+                    {eventPhotoPreview ? (
+                      <img src={eventPhotoPreview} alt="Event Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl text-slate-400">🖼️</span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5 flex-1">
+                    <label className="block font-bold text-slate-800">Upload Photo from Device</label>
+                    <p className="text-[11px] text-slate-500">Supports high-res / 4K photos. Automatically optimized for web.</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEventPhotoSelect}
+                      className="text-[11px] text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                    />
+                    {eventPhotoPreview && (
+                      <button
+                        type="button"
+                        onClick={() => setEventPhotoPreview("")}
+                        className="text-[10px] text-rose-600 hover:underline block mt-1"
+                      >
+                        Remove uploaded photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Event Title *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Youth Fellowship & Music"
+                      value={eventTitle}
+                      onChange={(e) => setEventTitle(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Date & Time</label>
+                    <input
+                      type="text"
+                      placeholder="Saturday - 3:30 PM"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Or Google Drive Photo Link</label>
+                    <input
+                      type="url"
+                      placeholder="https://drive.google.com/file/d/.../view"
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">YouTube / Facebook Video Link</label>
+                    <input
+                      type="url"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Date & Time</label>
-                  <input
-                    type="text"
-                    placeholder="Saturday - 3:30 PM"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Google Drive Photo Link</label>
-                  <input
-                    type="url"
-                    placeholder="https://drive.google.com/file/d/.../view"
-                    value={mediaUrl}
-                    onChange={(e) => setMediaUrl(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">YouTube / Facebook Video Link</label>
-                  <input
-                    type="url"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
                   <label className="block font-semibold text-slate-700 mb-1">Description *</label>
                   <textarea
                     required
@@ -598,7 +617,7 @@ export default function AdminDashboard() {
                     placeholder="Event summary..."
                     value={eventDesc}
                     onChange={(e) => setEventDesc(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
 
@@ -611,10 +630,7 @@ export default function AdminDashboard() {
             </section>
 
             <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="border-b pb-3 border-slate-100">
-                <h2 className="text-sm font-bold text-slate-900">Active Events ({events.length})</h2>
-              </div>
-
+              <h2 className="text-sm font-bold text-slate-900">Active Events ({events.length})</h2>
               {events.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-500">
                   No events posted yet.
@@ -649,12 +665,7 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {pendingMembers.length > 0 && (
               <section className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 shadow-sm space-y-4">
-                <div className="border-b pb-3 border-amber-200">
-                  <h2 className="text-sm font-bold text-amber-950 flex items-center gap-2">
-                    <span>⏳</span> Pending Review Queue ({pendingMembers.length})
-                  </h2>
-                </div>
-
+                <h2 className="text-sm font-bold text-amber-950">⏳ Pending Review Queue ({pendingMembers.length})</h2>
                 <div className="grid sm:grid-cols-2 gap-3">
                   {pendingMembers.map((m) => (
                     <div key={m.id} className="bg-white p-4 rounded-xl border border-amber-200 flex items-center justify-between">
@@ -668,18 +679,8 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleDeclineMember(m.id)}
-                          className="text-xs text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded border border-rose-200"
-                        >
-                          Decline
-                        </button>
-                        <button
-                          onClick={() => handleApproveMember(m.id)}
-                          className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1 rounded"
-                        >
-                          Approve
-                        </button>
+                        <button onClick={() => handleDeclineMember(m.id)} className="text-xs text-rose-600 px-2.5 py-1 rounded border border-rose-200">Decline</button>
+                        <button onClick={() => handleApproveMember(m.id)} className="text-xs bg-emerald-600 text-white font-bold px-3 py-1 rounded">Approve</button>
                       </div>
                     </div>
                   ))}
@@ -688,30 +689,25 @@ export default function AdminDashboard() {
             )}
 
             <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="border-b pb-3 border-slate-100">
-                <h2 className="text-sm font-bold text-slate-900">Approved Directory ({approvedMembers.length})</h2>
-              </div>
-
+              <h2 className="text-sm font-bold text-slate-900">Approved Directory ({approvedMembers.length})</h2>
               {approvedMembers.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-500">
-                  No approved members registered yet.
-                </div>
+                <div className="p-8 text-center bg-slate-50 border border-dashed rounded-xl text-xs text-slate-500">No approved members.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs text-slate-700">
-                    <thead className="bg-slate-50 text-slate-900 font-semibold border-b border-slate-200">
+                    <thead className="bg-slate-50 border-b">
                       <tr>
                         <th className="p-3">Member</th>
                         <th className="p-3">Contact</th>
-                        <th className="p-3">Ministry Role</th>
+                        <th className="p-3">Role</th>
                         <th className="p-3 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y">
                       {approvedMembers.map((m) => (
                         <tr key={m.id} className="hover:bg-slate-50">
-                          <td className="p-3 font-semibold text-slate-900 flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                          <td className="p-3 font-semibold flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0">
                               {m.photoUrl ? <img src={m.photoUrl} alt="" className="w-full h-full object-cover" /> : "👤"}
                             </div>
                             {m.fullName}
@@ -721,17 +717,13 @@ export default function AdminDashboard() {
                             <select
                               value={m.department || "Regular Church Member"}
                               onChange={(e) => handleDepartmentChange(m.id, e.target.value)}
-                              className="bg-white border border-slate-300 rounded px-2 py-1 text-xs"
+                              className="bg-white border rounded px-2 py-1 text-xs"
                             >
-                              {DEPARTMENTS.map((dept) => (
-                                <option key={dept} value={dept}>{dept}</option>
-                              ))}
+                              {DEPARTMENTS.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
                             </select>
                           </td>
                           <td className="p-3 text-right">
-                            <button onClick={() => handleDeleteMember(m.id)} className="text-rose-600 hover:underline">
-                              Remove
-                            </button>
+                            <button onClick={() => handleDeleteMember(m.id)} className="text-rose-600 hover:underline">Remove</button>
                           </td>
                         </tr>
                       ))}
@@ -746,31 +738,26 @@ export default function AdminDashboard() {
         {/* TAB 4: BANNER */}
         {activeTab === "banner" && (
           <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div className="border-b pb-3 border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900">Live Top Alert Announcement Banner</h2>
-              <p className="text-xs text-slate-500">Connected to all public pages immediately upon saving.</p>
-            </div>
+            <h2 className="text-sm font-bold text-slate-900">Live Top Alert Banner</h2>
             <form onSubmit={handleUpdateBanner} className="space-y-3 text-xs">
               <input
                 type="text"
-                placeholder="Type announcement notice..."
+                placeholder="Announcement notice..."
                 value={bannerNotice}
                 onChange={(e) => setBannerNotice(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
+                className="w-full bg-slate-50 border rounded-lg p-2.5 outline-none"
               />
               <div className="flex gap-2">
-                <button type="submit" className="bg-blue-700 hover:bg-blue-800 text-white font-bold px-4 py-2 rounded-lg">
-                  Save & Broadcast Banner
-                </button>
+                <button type="submit" className="bg-blue-700 text-white font-bold px-4 py-2 rounded-lg">Save & Broadcast</button>
                 <button
                   type="button"
                   onClick={() => {
                     setBannerNotice("");
                     localStorage.removeItem("church_banner");
                     broadcastDataChange();
-                    alert("Banner removed from live site!");
+                    alert("Banner cleared!");
                   }}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg"
+                  className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg"
                 >
                   Clear Banner
                 </button>
