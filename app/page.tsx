@@ -114,7 +114,7 @@ export default function ChurchHome() {
               href="/schedule"
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
             >
-              <span>📋</span> View Weekly Duty Roster
+              <span>📋</span> View Weekly Worship Schedule
             </Link>
             <a
               href="#services"

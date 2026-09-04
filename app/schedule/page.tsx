@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-interface ServiceDuty {
+interface ServiceWorship {
   role: string;
   assignedTo: string;
 }
@@ -12,7 +12,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceDuty[];
+  duties: ServiceWorship[];
 }
 
 interface WeekSchedule {
@@ -31,7 +31,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Wednesday - 6:30 PM",
     enabled: true,
     duties: [
-      { role: "Leader / Moderator", assignedTo: "Elder on Duty" },
+      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder" },
       { role: "Devotional Speaker", assignedTo: "Assigned Speaker" },
       { role: "Intercessory Prayer", assignedTo: "Prayer Ministry" },
     ],
@@ -87,7 +87,7 @@ export default function SchedulePage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("church_duty_schedule");
+    const saved = localStorage.getItem("church_Worship_schedule");
     if (saved) {
       try {
         setSchedule(JSON.parse(saved));
@@ -148,7 +148,7 @@ export default function SchedulePage() {
       <main className="max-w-5xl mx-auto px-4 py-10 w-full flex-1">
         <div className="text-center mb-8 space-y-2">
           <span className="text-xs font-bold text-blue-700 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-            Worship Participation & Officers on Duty
+            Worship Participation & Officers
           </span>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
             Church Worship Schedule
@@ -173,11 +173,11 @@ export default function SchedulePage() {
                   <span className="text-xs text-blue-300">{srv.time}</span>
                 </div>
                 <div className="p-5 divide-y divide-slate-100 flex-1">
-                  {srv.duties.map((duty, dIdx) => (
+                  {srv.duties.map((Worship, dIdx) => (
                     <div key={dIdx} className="py-2.5 flex justify-between items-center text-xs sm:text-sm">
-                      <span className="text-slate-600 font-medium">{duty.role}</span>
+                      <span className="text-slate-600 font-medium">{Worship.role}</span>
                       <span className="font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md text-right">
-                        {duty.assignedTo}
+                        {Worship.assignedTo}
                       </span>
                     </div>
                   ))}
@@ -188,7 +188,7 @@ export default function SchedulePage() {
         )}
 
         <div className="mt-8 text-center text-xs text-slate-500">
-          Scheduled participants unable to fulfill their duty are requested to inform the head deacon or elder in advance.
+          Scheduled participants unable to fulfill their Worship are requested to inform the head deacon or elder in advance.
         </div>
       </main>
 
