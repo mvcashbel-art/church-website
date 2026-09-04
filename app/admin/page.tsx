@@ -20,7 +20,7 @@ interface Member {
   department?: string;
 }
 
-interface ServiceWorship {
+interface ServiceDuty {
   role: string;
   assignedTo: string;
 }
@@ -29,7 +29,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceWorship[];
+  duties: ServiceDuty[];
 }
 
 interface WeekSchedule {
@@ -48,7 +48,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Wednesday - 6:30 PM",
     enabled: true,
     duties: [
-      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder " },
+      { role: "Leader / Moderator", assignedTo: "Elder on Duty" },
       { role: "Devotional Speaker", assignedTo: "Assigned Speaker" },
       { role: "Intercessory Prayer", assignedTo: "Prayer Ministry" },
     ],
@@ -123,7 +123,6 @@ export default function AdminDashboard() {
   const [bannerNotice, setBannerNotice] = useState("");
   const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
 
-  // Dedicated date picker state
   const [selectedServiceType, setSelectedServiceType] = useState("Midweek Worship");
   const [selectedDate, setSelectedDate] = useState("");
 
@@ -142,7 +141,7 @@ export default function AdminDashboard() {
     const savedBanner = localStorage.getItem("church_banner");
     if (savedBanner) setBannerNotice(savedBanner);
 
-    const savedSchedule = localStorage.getItem("church_worship_schedule");
+    const savedSchedule = localStorage.getItem("church_duty_schedule");
     if (savedSchedule) {
       try {
         const parsed = JSON.parse(savedSchedule);
@@ -158,7 +157,7 @@ export default function AdminDashboard() {
       setIsAuthenticated(true);
       setError("");
     } else {
-      setError("Invalid PIN. Default is 7777.");
+      setError("Incorrect security PIN. Access denied.");
     }
   };
 
@@ -221,17 +220,16 @@ export default function AdminDashboard() {
     setSchedule(updated);
   };
 
-  const handleUpdateWorship = (
+  const handleUpdateDuty = (
     serviceKey: keyof Omit<WeekSchedule, "dateRange">,
-    WorshipIndex: number,
+    dutyIndex: number,
     val: string
   ) => {
     const updated = { ...schedule };
-    updated[serviceKey].duties[WorshipIndex].assignedTo = val;
+    updated[serviceKey].duties[dutyIndex].assignedTo = val;
     setSchedule(updated);
   };
 
-  // When calendar date changes, construct the header and automatically update the alert banner
   const handleDatePick = (chosenDate: string, servicePrefix: string) => {
     setSelectedDate(chosenDate);
     if (!chosenDate) return;
@@ -244,20 +242,20 @@ export default function AdminDashboard() {
     });
 
     const newHeader = `${servicePrefix} | ${formatted}`;
-    const autoBanner = `📢 Upcoming: ${newHeader} - Please check the Worship roster for your assignments!`;
+    const autoBanner = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
 
     const updatedSchedule = { ...schedule, dateRange: newHeader };
     setSchedule(updatedSchedule);
     setBannerNotice(autoBanner);
 
-    localStorage.setItem("church_Worship_schedule", JSON.stringify(updatedSchedule));
+    localStorage.setItem("church_duty_schedule", JSON.stringify(updatedSchedule));
     localStorage.setItem("church_banner", autoBanner);
   };
 
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("church_Worship_schedule", JSON.stringify(schedule));
-    alert("Worship schedule, date header, and top banner saved!");
+    localStorage.setItem("church_duty_schedule", JSON.stringify(schedule));
+    alert("Worship duty schedule, date header, and top banner saved!");
   };
 
   const handleUpdateBanner = (e: React.FormEvent) => {
@@ -266,6 +264,7 @@ export default function AdminDashboard() {
     alert("Top alert banner updated!");
   };
 
+  // LOGIN SCREEN (PIN IS COMPLETELY HIDDEN)
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -273,15 +272,17 @@ export default function AdminDashboard() {
           <div className="text-center">
             <span className="text-3xl">🔐</span>
             <h1 className="text-xl font-bold text-slate-900 mt-2">Tubod SDA Admin Portal</h1>
-            <p className="text-xs text-slate-500">Enter your church admin PIN to manage website</p>
+            <p className="text-xs text-slate-500">Authorized personnel only</p>
           </div>
           {error && <p className="text-xs text-red-600 bg-red-50 p-2 rounded text-center">{error}</p>}
           <input
             type="password"
-            placeholder="Enter PIN (Default: 7777)"
+            inputMode="numeric"
+            autoComplete="current-password"
+            placeholder="••••"
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg p-2.5 text-center tracking-widest text-lg font-mono focus:ring-2 focus:ring-blue-700 outline-none"
+            className="w-full border border-slate-300 rounded-lg p-2.5 text-center tracking-[0.5em] text-2xl font-mono focus:ring-2 focus:ring-blue-700 outline-none"
           />
           <button type="submit" className="w-full bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2.5 rounded-lg text-sm">
             Unlock Admin Panel
@@ -317,13 +318,13 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* 1. PARTICIPANT Worship SCHEDULER */}
+        {/* 1. PARTICIPANT DUTY SCHEDULER */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Worship Scheduler & Date Settings</h2>
+              <h2 className="text-lg font-bold text-slate-900">Worship Duty Scheduler & Date Settings</h2>
               <p className="text-xs text-slate-500">
-                Pick a date below. It will automatically update the Worship schedule header and homepage announcement banner.
+                Pick a date below. It will automatically update the duty schedule header and homepage announcement banner.
               </p>
             </div>
             <button
@@ -418,13 +419,13 @@ export default function AdminDashboard() {
 
                   {isEnabled && (
                     <div className="space-y-2">
-                      {schedule[key].duties.map((Worship, idx) => (
+                      {schedule[key].duties.map((duty, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-xs">
-                          <span className="w-40 text-slate-600 font-medium truncate">{Worship.role}</span>
+                          <span className="w-40 text-slate-600 font-medium truncate">{duty.role}</span>
                           <input
                             type="text"
-                            value={Worship.assignedTo}
-                            onChange={(e) => handleUpdateWorship(key, idx, e.target.value)}
+                            value={duty.assignedTo}
+                            onChange={(e) => handleUpdateDuty(key, idx, e.target.value)}
                             className="flex-1 bg-white border border-slate-300 rounded-md px-2.5 py-1 text-xs focus:ring-2 focus:ring-blue-600 outline-none font-semibold text-slate-800"
                             placeholder="Assign member..."
                           />
