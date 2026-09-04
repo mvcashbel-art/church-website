@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-interface ServiceDuty {
+interface ServiceWorship {
   role: string;
   assignedTo: string;
 }
@@ -12,7 +12,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceDuty[];
+  duties: ServiceWorship[];
 }
 
 interface WeekSchedule {
@@ -87,7 +87,7 @@ export default function SchedulePage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("church_duty_schedule");
+    const saved = localStorage.getItem("church_Worship_schedule");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -148,7 +148,7 @@ export default function SchedulePage() {
             {schedule.dateRange || "Church Worship Schedule"}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
-            Assigned roles and duty roster for this service
+            Assigned roles and Worship roster for this service
           </p>
         </div>
 
@@ -157,7 +157,7 @@ export default function SchedulePage() {
             <span className="text-3xl">🗓️</span>
             <h3 className="font-bold text-slate-800 mt-2">No Service Currently Active</h3>
             <p className="text-xs text-slate-500 mt-1">
-              The church administrator has not enabled a duty schedule for this day yet.
+              The church administrator has not enabled a Worship schedule for this day yet.
             </p>
           </div>
         ) : (
@@ -175,11 +175,11 @@ export default function SchedulePage() {
                   </div>
 
                   <div className="p-5 divide-y divide-slate-100 flex-1 flex flex-col justify-around text-xs sm:text-sm">
-                    {item.duties.map((duty, idx) => (
+                    {item.duties.map((Worship, idx) => (
                       <div key={idx} className="py-2.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                        <span className="text-slate-600 font-medium">{duty.role}</span>
+                        <span className="text-slate-600 font-medium">{Worship.role}</span>
                         <span className="font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200/60 text-right">
-                          {duty.assignedTo || "—"}
+                          {Worship.assignedTo || "—"}
                         </span>
                       </div>
                     ))}
