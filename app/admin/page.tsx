@@ -257,7 +257,7 @@ export default function AdminDashboard() {
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("church_Worship_schedule", JSON.stringify(schedule));
-    alert("Worship Worship schedule, date header, and top banner saved!");
+    alert("Worship schedule, date header, and top banner saved!");
   };
 
   const handleUpdateBanner = (e: React.FormEvent) => {
@@ -321,7 +321,7 @@ export default function AdminDashboard() {
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Worship Worship Scheduler & Date Settings</h2>
+              <h2 className="text-lg font-bold text-slate-900">Worship Scheduler & Date Settings</h2>
               <p className="text-xs text-slate-500">
                 Pick a date below. It will automatically update the Worship schedule header and homepage announcement banner.
               </p>
