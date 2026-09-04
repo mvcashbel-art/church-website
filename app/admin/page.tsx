@@ -20,7 +20,7 @@ interface Member {
   department?: string;
 }
 
-interface ServiceDuty {
+interface ServiceWorship {
   role: string;
   assignedTo: string;
 }
@@ -29,7 +29,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceDuty[];
+  duties: ServiceWorship[];
 }
 
 interface WeekSchedule {
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
     const savedBanner = localStorage.getItem("church_banner");
     if (savedBanner) setBannerNotice(savedBanner);
 
-    const savedSchedule = localStorage.getItem("church_duty_schedule");
+    const savedSchedule = localStorage.getItem("church_Worship_schedule");
     if (savedSchedule) {
       try {
         setSchedule(JSON.parse(savedSchedule));
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
   // Completely wipe active schedule and remove floating alert
   const handleClearEntireSchedule = () => {
     setSchedule(BLANK_SCHEDULE);
-    localStorage.setItem("church_duty_schedule", JSON.stringify(BLANK_SCHEDULE));
+    localStorage.setItem("church_Worship_schedule", JSON.stringify(BLANK_SCHEDULE));
     localStorage.removeItem("church_banner");
     setBannerNotice("");
     alert("Upcoming worship alert and all active schedule duties have been deleted.");
@@ -237,13 +237,13 @@ export default function AdminDashboard() {
     setSchedule(updated);
   };
 
-  const handleUpdateDuty = (
+  const handleUpdateWorship = (
     serviceKey: keyof Omit<WeekSchedule, "dateRange">,
-    dutyIndex: number,
+    WorshipIndex: number,
     val: string
   ) => {
     const updated = { ...schedule };
-    updated[serviceKey].duties[dutyIndex].assignedTo = val;
+    updated[serviceKey].duties[WorshipIndex].assignedTo = val;
     setSchedule(updated);
   };
 
@@ -282,19 +282,19 @@ export default function AdminDashboard() {
         year: "numeric",
       });
       const newHeader = `${serviceType} | ${formatted}`;
-      const autoBanner = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
+      const autoBanner = `📢 Upcoming: ${newHeader} - Please check the Worship roster for your assignments!`;
       updated.dateRange = newHeader;
       setBannerNotice(autoBanner);
       localStorage.setItem("church_banner", autoBanner);
     }
 
     setSchedule(updated);
-    localStorage.setItem("church_duty_schedule", JSON.stringify(updated));
+    localStorage.setItem("church_Worship_schedule", JSON.stringify(updated));
   };
 
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("church_duty_schedule", JSON.stringify(schedule));
+    localStorage.setItem("church_Worship_schedule", JSON.stringify(schedule));
     alert("Worship duties and active schedule saved!");
   };
 
@@ -404,11 +404,11 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* 2. WORSHIP DUTY SCHEDULER & UPCOMING SERVICE ALERT CONTROL */}
+        {/* 2. WORSHIP Worship SCHEDULER & UPCOMING SERVICE ALERT CONTROL */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Upcoming Service Alert & Duty Scheduler</h2>
+              <h2 className="text-lg font-bold text-slate-900">Upcoming Service Alert & Worship Scheduler</h2>
               <p className="text-xs text-slate-500">
                 Controls both the floating side alert and the roster on <code>/schedule</code>.
               </p>
@@ -516,13 +516,13 @@ export default function AdminDashboard() {
 
                   {isEnabled && (
                     <div className="space-y-2">
-                      {schedule[key].duties.map((duty, idx) => (
+                      {schedule[key].duties.map((Worship, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-xs">
-                          <span className="w-40 text-slate-600 font-medium truncate">{duty.role}</span>
+                          <span className="w-40 text-slate-600 font-medium truncate">{Worship.role}</span>
                           <input
                             type="text"
-                            value={duty.assignedTo}
-                            onChange={(e) => handleUpdateDuty(key, idx, e.target.value)}
+                            value={Worship.assignedTo}
+                            onChange={(e) => handleUpdateWorship(key, idx, e.target.value)}
                             className="flex-1 bg-white border border-slate-300 rounded-md px-2.5 py-1 text-xs focus:ring-2 focus:ring-blue-600 outline-none font-semibold text-slate-800"
                             placeholder="Assign member..."
                           />
