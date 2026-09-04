@@ -28,6 +28,7 @@ interface Member {
   address: string;
   registeredAt: string;
   department?: string;
+  photoUrl?: string;
 }
 
 const SERVICE_TEMPLATES: Record<string, { title: string; defaultTime: string; roles: string[] }> = {
@@ -97,7 +98,7 @@ export default function AdminDashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [bannerNotice, setBannerNotice] = useState("");
 
-  // Create form state
+  // Create schedule form state
   const [chosenType, setChosenType] = useState("Sabbath School");
   const [serviceDate, setServiceDate] = useState("");
   const [serviceDuties, setServiceDuties] = useState<{ role: string; assignedTo: string }[]>(
@@ -114,7 +115,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     let combinedList: ScheduledServiceItem[] = [];
 
-    // 1. Load multi schedules
     const savedSchedules = localStorage.getItem("church_multi_schedules");
     if (savedSchedules) {
       try {
@@ -122,7 +122,6 @@ export default function AdminDashboard() {
       } catch (e) {}
     }
 
-    // 2. Clear out the phantom legacy schedule by importing it once so it can be managed/deleted
     const savedLegacy = localStorage.getItem("church_duty_schedule");
     if (savedLegacy) {
       try {
@@ -132,7 +131,6 @@ export default function AdminDashboard() {
 
         legacyKeys.forEach((k) => {
           if (leg[k]?.enabled) {
-            // Only add if not already in multi list
             if (!combinedList.some((item) => item.serviceType === leg[k].title)) {
               combinedList.push({
                 id: `legacy-${k}-${Date.now()}`,
@@ -145,7 +143,6 @@ export default function AdminDashboard() {
             }
           }
         });
-        // Remove legacy key so it never ghosts again
         localStorage.removeItem("church_duty_schedule");
         localStorage.setItem("church_multi_schedules", JSON.stringify(combinedList));
       } catch (e) {}
@@ -262,7 +259,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Events
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle || !eventDesc) return;
@@ -367,7 +363,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* 1. MANAGE & EDIT ACTIVE SCHEDULES (WITH DELETE & ROLE EDITING) */}
+        {/* 1. MANAGE & EDIT ACTIVE SCHEDULES */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
             <div>
@@ -413,7 +409,6 @@ export default function AdminDashboard() {
                     </button>
                   </div>
 
-                  {/* INLINE DUTY EDITORS */}
                   <div className="grid sm:grid-cols-2 gap-2 text-xs">
                     {s.duties.map((duty, dIdx) => (
                       <div key={dIdx} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200">
@@ -641,11 +636,11 @@ export default function AdminDashboard() {
           </form>
         </section>
 
-        {/* 6. REGISTERED MEMBERS DIRECTORY */}
+        {/* 6. REGISTERED MEMBERS DIRECTORY WITH PROFILE PHOTOS */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div>
             <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
-            <p className="text-xs text-slate-500">Assign ministry roles or remove records.</p>
+            <p className="text-xs text-slate-500">Manage church members, profile pictures, and ministry roles.</p>
           </div>
 
           {members.length === 0 ? (
@@ -655,7 +650,7 @@ export default function AdminDashboard() {
               <table className="w-full text-left text-xs text-slate-700">
                 <thead className="bg-slate-50 text-slate-900 font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="p-3">Full Name</th>
+                    <th className="p-3">Member</th>
                     <th className="p-3">Contact</th>
                     <th className="p-3">Address</th>
                     <th className="p-3">Ministry Role</th>
@@ -665,9 +660,25 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {members.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-50">
-                      <td className="p-3 font-semibold text-slate-900">{m.fullName}</td>
-                      <td className="p-3">{m.phone}</td>
-                      <td className="p-3">{m.address}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center shrink-0 shadow-xs">
+                            {m.photoUrl ? (
+                              <img src={m.photoUrl} alt={m.fullName} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-sm text-slate-500 font-bold">
+                                {m.fullName.charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900">{m.fullName}</div>
+                            <div className="text-[10px] text-slate-400">Joined {m.registeredAt}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 font-medium">{m.phone}</td>
+                      <td className="p-3">{m.address || "—"}</td>
                       <td className="p-3">
                         <select
                           value={m.department || "Regular Church Member"}
@@ -684,7 +695,7 @@ export default function AdminDashboard() {
                       <td className="p-3 text-right">
                         <button
                           onClick={() => handleDeleteMember(m.id)}
-                          className="text-rose-600 hover:underline font-medium"
+                          className="text-rose-600 hover:underline font-semibold"
                         >
                           Remove
                         </button>
