@@ -27,14 +27,10 @@ interface WeekSchedule {
 export default function ServiceAlertToast() {
   const [visible, setVisible] = useState(false);
   const [scheduleTitle, setScheduleTitle] = useState("");
-  const [daysRemainingText, setDaysRemainingText] = useState("");
+  const [statusBadge, setStatusBadge] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
-    // Check if user dismissed it this session
-    const dismissed = sessionStorage.getItem("dismiss_service_alert");
-    if (dismissed) return;
-
     const savedSchedule = localStorage.getItem("church_duty_schedule");
     if (!savedSchedule) return;
 
@@ -44,53 +40,59 @@ export default function ServiceAlertToast() {
 
       setScheduleTitle(header);
 
-      // Attempt to extract the date portion after the pipe "|"
+      // Extract the date portion after the pipe "|"
       const datePart = header.includes("|") ? header.split("|")[1].trim() : header;
-      const targetTime = new Date(datePart).getTime();
+      const targetDate = new Date(datePart);
 
-      if (!isNaN(targetTime)) {
-        const now = new Date().getTime();
-        const diffHours = (targetTime - now) / (1000 * 60 * 60);
+      if (!isNaN(targetDate.getTime())) {
+        const now = new Date();
 
-        if (diffHours < -24) {
-          // Event already ended more than a day ago
+        // Calculate end of the scheduled event day (11:59:59 PM)
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Check if the scheduled day has completely ended
+        if (now.getTime() > endOfDay.getTime()) {
+          // The program/day is finished, hide the schedule alert
           setVisible(false);
-        } else if (diffHours <= 0 && diffHours >= -24) {
-          // Happening today!
-          setDaysRemainingText("🔴 Happening Today!");
+          return;
+        }
+
+        // Compare calendar days
+        const isSameDay =
+          now.getFullYear() === targetDate.getFullYear() &&
+          now.getMonth() === targetDate.getMonth() &&
+          now.getDate() === targetDate.getDate();
+
+        const diffHours = (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+        if (isSameDay) {
+          setStatusBadge("🔴 Happening Today!");
           setIsUrgent(true);
           setVisible(true);
         } else if (diffHours > 0 && diffHours <= 24) {
-          // Tomorrow or under 24 hours
-          setDaysRemainingText("⚡ Tomorrow / In less than 24 hours!");
+          setStatusBadge("⚡ Tomorrow / In < 24 Hours");
           setIsUrgent(true);
           setVisible(true);
         } else if (diffHours > 24 && diffHours <= 72) {
-          // In 2-3 days
           const days = Math.ceil(diffHours / 24);
-          setDaysRemainingText(`⏳ In ${days} days`);
+          setStatusBadge(`⏳ In ${days} Days`);
           setIsUrgent(false);
           setVisible(true);
         } else {
-          // Show upcoming alert if within a week
-          setDaysRemainingText("🗓️ Upcoming Service");
+          setStatusBadge("🗓️ Upcoming Service");
           setIsUrgent(false);
           setVisible(true);
         }
       } else {
-        // If it's a custom text header with no clean date, still show notification
-        setDaysRemainingText("🗓️ Active Duty Schedule");
+        // Fallback for custom labels without standard date formatting
+        setStatusBadge("🗓️ Active Duty Schedule");
         setVisible(true);
       }
     } catch (e) {
       console.error(e);
     }
   }, []);
-
-  const handleDismiss = () => {
-    setVisible(false);
-    sessionStorage.setItem("dismiss_service_alert", "true");
-  };
 
   if (!visible) return null;
 
@@ -102,54 +104,42 @@ export default function ServiceAlertToast() {
       <div
         className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex flex-col gap-2 ${
           isUrgent
-            ? "bg-amber-500/95 border-amber-600 text-slate-950 animate-bounce-short"
-            : "bg-slate-900/95 border-slate-700 text-white"
+            ? "bg-amber-500/95 border-amber-600 text-slate-950 shadow-amber-500/20"
+            : "bg-slate-900/95 border-slate-700 text-white shadow-slate-950/40"
         }`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span
-                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  isUrgent ? "bg-rose-600" : "bg-blue-400"
-                }`}
-              ></span>
-              <span
-                className={`relative inline-flex rounded-full h-3 w-3 ${
-                  isUrgent ? "bg-rose-600" : "bg-blue-500"
-                }`}
-              ></span>
-            </span>
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-3 w-3">
             <span
-              className={`text-[11px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded ${
-                isUrgent ? "bg-black/20 text-slate-950" : "bg-blue-600/30 text-blue-300"
+              className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                isUrgent ? "bg-rose-600" : "bg-blue-400"
               }`}
-            >
-              {daysRemainingText}
-            </span>
-          </div>
-
-          <button
-            onClick={handleDismiss}
-            className={`text-xs p-1 rounded-full transition-colors ${
-              isUrgent ? "hover:bg-amber-600 text-slate-900" : "hover:bg-slate-800 text-slate-400"
+            ></span>
+            <span
+              className={`relative inline-flex rounded-full h-3 w-3 ${
+                isUrgent ? "bg-rose-600" : "bg-blue-500"
+              }`}
+            ></span>
+          </span>
+          <span
+            className={`text-[11px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded ${
+              isUrgent ? "bg-black/20 text-slate-950" : "bg-blue-600/30 text-blue-300"
             }`}
-            title="Dismiss alert"
           >
-            ✕
-          </button>
+            {statusBadge}
+          </span>
         </div>
 
         <div>
           <h4 className="font-bold text-sm leading-tight line-clamp-2 mt-1">
-            {scheduleTitle || "Upcoming Worship Service"}
+            {scheduleTitle || "Active Worship Service"}
           </h4>
           <p
             className={`text-xs mt-1 leading-relaxed ${
               isUrgent ? "text-slate-900 font-medium" : "text-slate-300"
             }`}
           >
-            Please check your assigned roles and duties for this gathering.
+            Active schedule roster. Please review duty assignments.
           </p>
         </div>
 
