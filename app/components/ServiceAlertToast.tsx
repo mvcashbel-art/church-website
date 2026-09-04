@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface ServiceDuty {
+interface ServiceWorship {
   role: string;
   assignedTo: string;
 }
@@ -13,7 +13,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceDuty[];
+  duties: ServiceWorship[];
 }
 
 interface WeekSchedule {
@@ -34,7 +34,7 @@ export default function ServiceAlertToast() {
 
   useEffect(() => {
     const checkSchedule = () => {
-      const savedSchedule = localStorage.getItem("church_duty_schedule");
+      const savedSchedule = localStorage.getItem("church_Worship_schedule");
       if (!savedSchedule) {
         setVisible(false);
         return;
@@ -95,7 +95,7 @@ export default function ServiceAlertToast() {
             setVisible(true);
           }
         } else {
-          setStatusBadge("🗓️ Active Duty Schedule");
+          setStatusBadge("🗓️ Active Worship Schedule");
           setVisible(true);
         }
       } catch (e) {
@@ -152,7 +152,7 @@ export default function ServiceAlertToast() {
               isUrgent ? "text-slate-900 font-medium" : "text-slate-300"
             }`}
           >
-            Active schedule roster. Please review duty assignments.
+            Active schedule roster. Please review Worship assignments.
           </p>
         </div>
 
@@ -165,7 +165,7 @@ export default function ServiceAlertToast() {
                 : "bg-blue-600 text-white hover:bg-blue-500"
             }`}
           >
-            View Duty Roster &rarr;
+            View Worship Roster &rarr;
           </Link>
           <span className="text-[10px] opacity-75">Tubod SDA</span>
         </div>
