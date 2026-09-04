@@ -19,7 +19,7 @@ interface AlertItem {
   time: string;
   date: string;
   badgeText: string;
-  isUrgent: boolean;
+  isUrgent: boolean; // true only for Today / Tomorrow
 }
 
 export default function ServiceAlertToast() {
@@ -36,7 +36,7 @@ export default function ServiceAlertToast() {
       try {
         const list: ScheduledServiceItem[] = JSON.parse(savedMulti);
         
-        // Filter active services (hasn't passed midnight of service day)
+        // Filter active services
         const valid = list.filter((item) => {
           if (!item.date) return false;
           const endOfDay = new Date(item.date);
@@ -57,7 +57,7 @@ export default function ServiceAlertToast() {
             now.getMonth() === target.getMonth() &&
             now.getDate() === target.getDate();
 
-          let badge = "🗓️ Upcoming";
+          let badge = "🗓️ Upcoming Roster";
           let urgent = false;
 
           if (isSameDay) {
@@ -69,6 +69,7 @@ export default function ServiceAlertToast() {
           } else {
             const days = Math.ceil(diffHours / 24);
             badge = `⏳ In ${days} Days`;
+            urgent = false; // Future dates stay sleek dark blue
           }
 
           candidateList.push({
@@ -122,10 +123,10 @@ export default function ServiceAlertToast() {
         className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex flex-col gap-2.5 transition-colors duration-300 ${
           current.isUrgent
             ? "bg-amber-500 text-slate-950 border-amber-600 shadow-amber-500/25"
-            : "bg-slate-900/95 text-white border-slate-700 shadow-slate-950/40"
+            : "bg-[#111a2e] text-white border-slate-700 shadow-slate-950/50"
         }`}
       >
-        {/* TOP STATUS BAR WITH SCROLL CONTROLS */}
+        {/* HEADER CONTROLS */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
@@ -149,7 +150,6 @@ export default function ServiceAlertToast() {
             </span>
           </div>
 
-          {/* ARROWS FOR SCROLLING THROUGH SERVICES */}
           {items.length > 1 && (
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-mono opacity-70 mr-1">
@@ -181,7 +181,7 @@ export default function ServiceAlertToast() {
           )}
         </div>
 
-        {/* SERVICE INFO (CHANGES AS YOU SCROLL) */}
+        {/* SERVICE INFO */}
         <div>
           <h4 className="font-black text-sm leading-tight truncate">
             {current.serviceType}
