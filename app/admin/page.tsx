@@ -41,16 +41,16 @@ interface WeekSchedule {
   ay: ServiceSchedule;
 }
 
-const DEFAULT_SCHEDULE: WeekSchedule = {
-  dateRange: "Midweek Worship | September 9, 2026",
+const BLANK_SCHEDULE: WeekSchedule = {
+  dateRange: "",
   midweek: {
     title: "Wednesday Prayer Meeting",
     time: "Wednesday - 6:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
-      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder" },
-      { role: "Devotional Speaker", assignedTo: "Assigned Speaker" },
-      { role: "Intercessory Prayer", assignedTo: "Prayer Ministry" },
+      { role: "Leader / Moderator", assignedTo: "" },
+      { role: "Devotional Speaker", assignedTo: "" },
+      { role: "Intercessory Prayer", assignedTo: "" },
     ],
   },
   vespers: {
@@ -58,9 +58,9 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Friday - 6:30 PM",
     enabled: false,
     duties: [
-      { role: "Song Leader", assignedTo: "Music Ministry" },
-      { role: "Devotional Message", assignedTo: "Assigned Speaker" },
-      { role: "Opening / Closing Prayer", assignedTo: "Assigned Member" },
+      { role: "Song Leader", assignedTo: "" },
+      { role: "Devotional Message", assignedTo: "" },
+      { role: "Opening / Closing Prayer", assignedTo: "" },
     ],
   },
   sabbathSchool: {
@@ -68,10 +68,10 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Saturday - 8:30 AM",
     enabled: false,
     duties: [
-      { role: "Superintendent", assignedTo: "SS Superintendent" },
-      { role: "Song Leader / Chorister", assignedTo: "Music Ministry" },
-      { role: "Mission Story Reader", assignedTo: "Youth Volunteer" },
-      { role: "Lesson Teachers", assignedTo: "Class Teachers" },
+      { role: "Superintendent", assignedTo: "" },
+      { role: "Song Leader / Chorister", assignedTo: "" },
+      { role: "Mission Story Reader", assignedTo: "" },
+      { role: "Lesson Teachers", assignedTo: "" },
     ],
   },
   divineWorship: {
@@ -79,11 +79,11 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Saturday - 10:30 AM",
     enabled: false,
     duties: [
-      { role: "Platform Elder", assignedTo: "First Elder" },
-      { role: "Preacher / Speaker", assignedTo: "Church Pastor / Elder" },
-      { role: "Scripture Reading", assignedTo: "Youth Reader" },
-      { role: "Pastoral Prayer", assignedTo: "Ordained Elder" },
-      { role: "Offertory / Deacons", assignedTo: "Head Deacon & Team" },
+      { role: "Platform Elder", assignedTo: "" },
+      { role: "Preacher / Speaker", assignedTo: "" },
+      { role: "Scripture Reading", assignedTo: "" },
+      { role: "Pastoral Prayer", assignedTo: "" },
+      { role: "Offertory / Deacons", assignedTo: "" },
     ],
   },
   ay: {
@@ -91,28 +91,13 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Saturday - 3:30 PM",
     enabled: false,
     duties: [
-      { role: "AY Program Leader", assignedTo: "AY Sponsor" },
-      { role: "Song Service", assignedTo: "AY Praise Team" },
-      { role: "Special Musical Item", assignedTo: "Choir / Soloist" },
-      { role: "Vespers / Closing Sunset", assignedTo: "AY Leader" },
+      { role: "AY Program Leader", assignedTo: "" },
+      { role: "Song Service", assignedTo: "" },
+      { role: "Special Musical Item", assignedTo: "" },
+      { role: "Vespers / Closing Sunset", assignedTo: "" },
     ],
   },
 };
-
-const DEFAULT_EVENTS: ChurchEvent[] = [
-  {
-    id: 1,
-    title: "Sabbath School & Divine Worship",
-    date: "Every Saturday - 8:30 AM",
-    desc: "Join us for morning worship, lesson study, and fellowship luncheon.",
-  },
-  {
-    id: 2,
-    title: "Adventist Youth (AY) Fellowship",
-    date: "Saturday - 3:30 PM",
-    desc: "Praise music, discussions, and spiritual activities for youth of all ages.",
-  }
-];
 
 const DEPARTMENTS = [
   "Regular Church Member",
@@ -133,10 +118,11 @@ export default function AdminDashboard() {
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
 
-  const [events, setEvents] = useState<ChurchEvent[]>(DEFAULT_EVENTS);
+  // Start with empty array so hardcoded templates never re-spawn
+  const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [bannerNotice, setBannerNotice] = useState("");
-  const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
+  const [schedule, setSchedule] = useState<WeekSchedule>(BLANK_SCHEDULE);
 
   const [selectedServiceType, setSelectedServiceType] = useState("Midweek Worship");
   const [selectedDate, setSelectedDate] = useState("");
@@ -147,11 +133,11 @@ export default function AdminDashboard() {
   const [imagePreview, setImagePreview] = useState<string>("");
 
   useEffect(() => {
+    // Only fetch saved items; if user deleted them, keep them empty
     const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents) {
+    if (savedEvents !== null) {
       try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed.length > 0) setEvents(parsed);
+        setEvents(JSON.parse(savedEvents));
       } catch (e) {}
     }
 
@@ -164,8 +150,7 @@ export default function AdminDashboard() {
     const savedSchedule = localStorage.getItem("church_duty_schedule");
     if (savedSchedule) {
       try {
-        const parsed = JSON.parse(savedSchedule);
-        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
+        setSchedule(JSON.parse(savedSchedule));
       } catch (e) {}
     }
   }, []);
@@ -211,15 +196,23 @@ export default function AdminDashboard() {
     setDate("");
     setDesc("");
     setImagePreview("");
-    alert("Event published!");
+    alert("Event published successfully!");
   };
 
   const handleDeleteEvent = (id: number) => {
-    if (confirm("Are you sure you want to delete this event/highlight?")) {
-      const updated = events.filter((item) => item.id !== id);
-      setEvents(updated);
-      localStorage.setItem("church_events", JSON.stringify(updated));
-    }
+    const updated = events.filter((item) => item.id !== id);
+    setEvents(updated);
+    // Explicitly write updated array even if 0 items remain
+    localStorage.setItem("church_events", JSON.stringify(updated));
+  };
+
+  // Completely wipe active schedule and remove floating alert
+  const handleClearEntireSchedule = () => {
+    setSchedule(BLANK_SCHEDULE);
+    localStorage.setItem("church_duty_schedule", JSON.stringify(BLANK_SCHEDULE));
+    localStorage.removeItem("church_banner");
+    setBannerNotice("");
+    alert("Upcoming worship alert and all active schedule duties have been deleted.");
   };
 
   const handleDepartmentChange = (memberId: number, newDept: string) => {
@@ -302,13 +295,13 @@ export default function AdminDashboard() {
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("church_duty_schedule", JSON.stringify(schedule));
-    alert("Saved! Unselected services are now completely hidden on the public schedule page.");
+    alert("Worship duties and active schedule saved!");
   };
 
   const handleUpdateBanner = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("church_banner", bannerNotice);
-    alert("Top alert banner updated!");
+    alert("Banner updated!");
   };
 
   if (!isAuthenticated) {
@@ -364,26 +357,82 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* 1. PARTICIPANT DUTY SCHEDULER */}
+        {/* 1. MANAGE & DELETE EXISTING EVENTS / HIGHLIGHTS */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-slate-800">Manage Active Events & Highlights ({events.length})</h2>
+              <p className="text-xs text-slate-500">Events currently showing in the public "Events & Highlights" section.</p>
+            </div>
+          </div>
+
+          {events.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+              <p className="text-xs text-slate-500 font-medium">All events have been deleted. Nothing is displayed on the homepage.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((ev) => (
+                <div key={ev.id} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col justify-between shadow-xs">
+                  {ev.image ? (
+                    <div className="h-32 w-full overflow-hidden bg-slate-200">
+                      <img src={ev.image} alt={ev.title} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="h-24 bg-blue-50 flex items-center justify-center text-blue-400 text-xs font-semibold">
+                      No Photo Attached
+                    </div>
+                  )}
+                  <div className="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">{ev.date}</span>
+                      <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mt-0.5">{ev.title}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-2 mt-1">{ev.desc}</p>
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-slate-200 flex justify-end">
+                      <button
+                        onClick={() => handleDeleteEvent(ev.id)}
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <span>🗑️</span> Delete Event
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* 2. WORSHIP DUTY SCHEDULER & UPCOMING SERVICE ALERT CONTROL */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Worship Duty Scheduler & Date Settings</h2>
+              <h2 className="text-lg font-bold text-slate-900">Upcoming Service Alert & Duty Scheduler</h2>
               <p className="text-xs text-slate-500">
-                Selecting a service automatically enables only its matching duties and hides all other days.
+                Controls both the floating side alert and the roster on <code>/schedule</code>.
               </p>
             </div>
-            <button
-              onClick={handleSaveSchedule}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow transition"
-            >
-              Save Schedule & Visibility
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClearEntireSchedule}
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1"
+              >
+                <span>🗑️</span> Clear Alert & Side Notification
+              </button>
+              <button
+                onClick={handleSaveSchedule}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow transition"
+              >
+                Save Schedule
+              </button>
+            </div>
           </div>
 
           <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-3">
             <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
-              📅 Set Worship Service & Date
+              📅 Set Service Type & Date
             </span>
             <div className="grid sm:grid-cols-3 gap-3">
               <div>
@@ -418,11 +467,12 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Generated Announcement Header</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Generated Service Header</label>
                 <input
                   type="text"
                   value={schedule.dateRange}
                   onChange={(e) => setSchedule({ ...schedule, dateRange: e.target.value })}
+                  placeholder="e.g. Midweek Worship | September 9, 2026"
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-blue-950 focus:ring-2 focus:ring-blue-700 outline-none"
                 />
               </div>
@@ -486,7 +536,7 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 2. TOP ALERT BANNER */}
+        {/* 3. TOP ALERT BANNER */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-slate-800">Live Top Alert Announcement Banner</h2>
@@ -503,49 +553,6 @@ export default function AdminDashboard() {
               Save Banner
             </button>
           </form>
-        </section>
-
-        {/* 3. MANAGE & DELETE EXISTING EVENTS / HIGHLIGHTS */}
-        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-800">Manage Active Events & Highlights ({events.length})</h2>
-            <p className="text-xs text-slate-500">View or remove posted church events displayed on the homepage.</p>
-          </div>
-
-          {events.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No events currently posted.</p>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {events.map((ev) => (
-                <div key={ev.id} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col justify-between shadow-xs">
-                  {ev.image ? (
-                    <div className="h-32 w-full overflow-hidden bg-slate-200">
-                      <img src={ev.image} alt={ev.title} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="h-24 bg-blue-50 flex items-center justify-center text-blue-400 text-xs font-semibold">
-                      No Photo Attached
-                    </div>
-                  )}
-                  <div className="p-3 flex-1 flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">{ev.date}</span>
-                      <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mt-0.5">{ev.title}</h4>
-                      <p className="text-xs text-slate-500 line-clamp-2 mt-1">{ev.desc}</p>
-                    </div>
-                    <div className="pt-3 mt-3 border-t border-slate-200 flex justify-end">
-                      <button
-                        onClick={() => handleDeleteEvent(ev.id)}
-                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                      >
-                        <span>🗑️</span> Delete Event
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         {/* 4. POST NEW EVENT WITH PHOTO */}
