@@ -8,27 +8,34 @@ interface ChurchEvent {
   title: string;
   date: string;
   desc: string;
-  image?: string;
+  mediaUrl?: string; // Google Drive image link or direct photo link
+  videoUrl?: string; // YouTube or Facebook video link
 }
 
-const DEFAULT_EVENTS: ChurchEvent[] = [
-  {
-    id: 1,
-    title: "Sabbath School & Divine Worship",
-    date: "Every Saturday - 8:30 AM",
-    desc: "Join us for morning worship, lesson study, and fellowship luncheon.",
-  },
-  {
-    id: 2,
-    title: "Adventist Youth (AY) Fellowship",
-    date: "Saturday - 3:30 PM",
-    desc: "Praise music, discussions, and spiritual activities for youth of all ages.",
+// Convert Google Drive share links or YouTube links to direct embeds
+function formatGoogleDriveUrl(url: string) {
+  if (!url) return "";
+  if (url.includes("drive.google.com")) {
+    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
+    }
   }
-];
+  return url;
+}
+
+function getYouTubeEmbedUrl(url: string) {
+  if (!url) return null;
+  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  }
+  return null;
+}
 
 export default function ChurchHome() {
-  const [events, setEvents] = useState<ChurchEvent[]>(DEFAULT_EVENTS);
-  const [banner, setBanner] = useState("📢 Upcoming: Midweek Worship | September 9, 2026 - Please check the Worship Schedule for your assignments!");
+  const [events, setEvents] = useState<ChurchEvent[]>([]);
+  const [banner, setBanner] = useState("");
 
   useEffect(() => {
     const savedEvents = localStorage.getItem("church_events");
@@ -40,20 +47,24 @@ export default function ChurchHome() {
     const savedBanner = localStorage.getItem("church_banner");
     if (savedBanner) {
       setBanner(savedBanner);
+    } else {
+      setBanner("");
     }
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-200 selection:text-blue-900">
-      {/* 1. HIGH-VISIBILITY YELLOW ANNOUNCEMENT BANNER */}
-      <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
-        <span className="inline-flex items-center gap-2">
-          <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
-          {banner}
-        </span>
-      </div>
+      {/* 1. ANNOUNCEMENT BANNER - ONLY SHOWS IF NOT EMPTY */}
+      {banner && (
+        <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
+          <span className="inline-flex items-center gap-2">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
+            {banner}
+          </span>
+        </div>
+      )}
 
-      {/* 2. BRIGHT HEADER */}
+      {/* 2. HEADER */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
@@ -90,7 +101,7 @@ export default function ChurchHome() {
         </div>
       </header>
 
-      {/* 3. LIGHT BLUE HERO */}
+      {/* 3. HERO */}
       <section className="relative overflow-hidden pt-16 pb-24 px-4 text-center bg-gradient-to-b from-blue-100/60 via-blue-50/40 to-slate-50">
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-blue-200 bg-white text-blue-700 text-xs font-semibold shadow-xs">
@@ -182,7 +193,7 @@ export default function ChurchHome() {
         </div>
       </section>
 
-      {/* 5. EVENTS & PHOTO HIGHLIGHTS */}
+      {/* 5. EVENTS & PHOTO/VIDEO HIGHLIGHTS */}
       <section id="events" className="py-12 px-4 max-w-6xl mx-auto w-full">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-3 border-b border-slate-200/80 pb-4">
           <div>
@@ -190,45 +201,88 @@ export default function ChurchHome() {
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Events & Highlights</h2>
           </div>
           <Link href="/admin" className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors">
-            Upload Event &rarr;
+            Upload / Manage &rarr;
           </Link>
         </div>
 
         {events.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500 text-xs">
-            No highlights or events posted right now. Use the Admin Portal to upload new events.
+            No highlights or events posted right now.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((ev) => (
-              <div
-                key={ev.id}
-                className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
-              >
-                {ev.image ? (
-                  <div className="relative h-48 w-full overflow-hidden bg-slate-100">
-                    <img
-                      src={ev.image}
-                      alt={ev.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-40 bg-blue-50/50 flex items-center justify-center text-blue-400 text-xs font-medium">
-                    Tubod SDA Sanctuary
-                  </div>
-                )}
-                <div className="p-5 flex-1 flex flex-col justify-between">
-                  <div>
-                    <span className="text-[11px] font-bold text-blue-600 tracking-wide uppercase">{ev.date}</span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1 group-hover:text-blue-600 transition-colors">
-                      {ev.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">{ev.desc}</p>
+            {events.map((ev) => {
+              const ytEmbed = ev.videoUrl ? getYouTubeEmbedUrl(ev.videoUrl) : null;
+              const photoUrl = ev.mediaUrl ? formatGoogleDriveUrl(ev.mediaUrl) : null;
+
+              return (
+                <div
+                  key={ev.id}
+                  className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+                >
+                  {/* VIDEO EMBED OR DRIVE PHOTO */}
+                  {ytEmbed ? (
+                    <div className="relative aspect-video w-full bg-black">
+                      <iframe
+                        src={ytEmbed}
+                        title={ev.title}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : photoUrl ? (
+                    <div className="relative h-48 w-full overflow-hidden bg-slate-100">
+                      <img
+                        src={photoUrl}
+                        alt={ev.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                      />
+                    </div>
+                  ) : ev.videoUrl ? (
+                    <div className="h-44 bg-blue-900 text-white flex flex-col items-center justify-center p-4 text-center">
+                      <span className="text-2xl mb-1">▶️</span>
+                      <a
+                        href={ev.videoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-bold underline hover:text-blue-200"
+                      >
+                        Watch Video on Facebook / External &rarr;
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="h-40 bg-blue-50/50 flex items-center justify-center text-blue-400 text-xs font-medium">
+                      Tubod SDA Sanctuary
+                    </div>
+                  )}
+
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[11px] font-bold text-blue-600 tracking-wide uppercase">{ev.date}</span>
+                      <h3 className="text-base font-bold text-slate-900 mt-1 group-hover:text-blue-600 transition-colors">
+                        {ev.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-2 leading-relaxed">{ev.desc}</p>
+                    </div>
+
+                    {ev.videoUrl && !ytEmbed && (
+                      <div className="pt-3 mt-3 border-t border-slate-100">
+                        <a
+                          href={ev.videoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          <span>🔗</span> Open Video Link &rarr;
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -241,7 +295,7 @@ export default function ChurchHome() {
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Join the Church Fellowship Directory</h2>
           <p className="text-slate-600 text-sm max-w-lg mx-auto">
-            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service Schedules and updates.
+            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service rosters and updates.
           </p>
           <div className="pt-2">
             <Link
