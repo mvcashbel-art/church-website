@@ -29,6 +29,7 @@ interface Member {
   registeredAt: string;
   department?: string;
   photoUrl?: string;
+  status?: "pending" | "approved";
 }
 
 const SERVICE_TEMPLATES: Record<string, { title: string; defaultTime: string; roles: string[] }> = {
@@ -161,7 +162,10 @@ export default function AdminDashboard() {
     const savedMembers = localStorage.getItem("church_members");
     if (savedMembers) {
       try {
-        setMembers(JSON.parse(savedMembers));
+        const parsed: Member[] = JSON.parse(savedMembers);
+        // Ensure any pre-existing legacy members default to approved
+        const normalized = parsed.map((m) => ({ ...m, status: m.status || "approved" }));
+        setMembers(normalized);
       } catch (e) {}
     }
 
@@ -290,6 +294,21 @@ export default function AdminDashboard() {
     localStorage.setItem("church_events", JSON.stringify(updated));
   };
 
+  // Member Approval & Directory Handlers
+  const handleApproveMember = (id: number) => {
+    const updated = members.map((m) => (m.id === id ? { ...m, status: "approved" as const } : m));
+    setMembers(updated);
+    localStorage.setItem("church_members", JSON.stringify(updated));
+  };
+
+  const handleDeclineMember = (id: number) => {
+    if (confirm("Decline and remove this applicant?")) {
+      const updated = members.filter((m) => m.id !== id);
+      setMembers(updated);
+      localStorage.setItem("church_members", JSON.stringify(updated));
+    }
+  };
+
   const handleDepartmentChange = (memberId: number, newDept: string) => {
     const updated = members.map((m) => (m.id === memberId ? { ...m, department: newDept } : m));
     setMembers(updated);
@@ -309,6 +328,9 @@ export default function AdminDashboard() {
     localStorage.setItem("church_banner", bannerNotice);
     alert("Banner updated!");
   };
+
+  const pendingMembers = members.filter((m) => m.status === "pending");
+  const approvedMembers = members.filter((m) => m.status !== "pending");
 
   if (!isAuthenticated) {
     return (
@@ -636,15 +658,84 @@ export default function AdminDashboard() {
           </form>
         </section>
 
-        {/* 6. REGISTERED MEMBERS DIRECTORY WITH PROFILE PHOTOS */}
-        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
-            <p className="text-xs text-slate-500">Manage church members, profile pictures, and ministry roles.</p>
+        {/* 6. PENDING APPROVAL QUEUE (NEW MEMBERS TO REVIEW) */}
+        <section className="bg-amber-50/70 border border-amber-200 rounded-xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b pb-3 border-amber-200/80">
+            <div>
+              <h2 className="text-base font-bold text-amber-950 flex items-center gap-2">
+                <span>⏳</span> Pending Member Registrations ({pendingMembers.length})
+              </h2>
+              <p className="text-xs text-amber-800">
+                Review submitted profiles. Approved members appear in the official directory.
+              </p>
+            </div>
+            {pendingMembers.length > 0 && (
+              <span className="bg-amber-500 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full animate-pulse">
+                Action Required
+              </span>
+            )}
           </div>
 
-          {members.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">No registered members yet.</p>
+          {pendingMembers.length === 0 ? (
+            <div className="p-6 text-center bg-white/70 border border-dashed border-amber-300 rounded-xl text-xs text-amber-800">
+              ✓ No pending registrations. All applicants have been reviewed.
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {pendingMembers.map((m) => (
+                <div key={m.id} className="bg-white p-4 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-300 overflow-hidden flex items-center justify-center shrink-0">
+                      {m.photoUrl ? (
+                        <img src={m.photoUrl} alt={m.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-base text-slate-400 font-bold">
+                          {m.fullName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm text-slate-900 truncate">{m.fullName}</h4>
+                      <p className="text-xs text-slate-600">{m.phone}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{m.address || "No address provided"}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                          {m.department || "Regular Member"}
+                        </span>
+                        <span className="text-[10px] text-slate-400">Applied {m.registeredAt}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleDeclineMember(m.id)}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold px-3 py-1.5 rounded-lg border border-rose-200 transition"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      onClick={() => handleApproveMember(m.id)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-xs transition"
+                    >
+                      ✓ Approve Member
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* 7. APPROVED CHURCH DIRECTORY */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Approved Church Directory ({approvedMembers.length})</h2>
+            <p className="text-xs text-slate-500">Official church members with assigned roles.</p>
+          </div>
+
+          {approvedMembers.length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No approved members yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-700">
@@ -658,7 +749,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {members.map((m) => (
+                  {approvedMembers.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-50">
                       <td className="p-3">
                         <div className="flex items-center gap-3">
