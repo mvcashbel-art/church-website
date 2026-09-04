@@ -3,7 +3,7 @@
 import { useState, ChangeEvent } from "react";
 import Link from "next/link";
 
-interface Member {
+export interface Member {
   id: number;
   fullName: string;
   phone: string;
@@ -11,6 +11,7 @@ interface Member {
   registeredAt: string;
   department?: string;
   photoUrl?: string;
+  status: "pending" | "approved";
 }
 
 export default function RegisterPage() {
@@ -21,7 +22,6 @@ export default function RegisterPage() {
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const [submitted, setSubmitted] = useState(false);
 
-  // Resize and compress photo so it easily fits localStorage
   const handlePhotoSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -77,6 +77,7 @@ export default function RegisterPage() {
       }),
       department,
       photoUrl: photoPreview || "",
+      status: "pending",
     };
 
     const saved = localStorage.getItem("church_members");
@@ -104,13 +105,13 @@ export default function RegisterPage() {
         <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-sm">
           {submitted ? (
             <div className="text-center py-8 space-y-4">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-3xl">
-                ✓
+              <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto text-3xl">
+                ⏳
               </div>
-              <h2 className="text-2xl font-black text-slate-900">Registration Complete!</h2>
-              <p className="text-sm text-slate-600 max-w-sm mx-auto">
-                Thank you, <strong>{fullName}</strong>. Your membership profile has been saved to the church fellowship directory.
-              </p>
+              <h2 className="text-2xl font-black text-slate-900">Application Submitted!</h2>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 leading-relaxed max-w-sm mx-auto">
+                Thank you, <strong>{fullName}</strong>. Your profile has been sent for <strong>pastoral & admin review</strong>. Once verified, you will be listed in the official directory.
+              </div>
               <div className="pt-4 flex justify-center gap-3">
                 <Link
                   href="/"
@@ -140,12 +141,11 @@ export default function RegisterPage() {
                 </span>
                 <h1 className="text-2xl font-black text-slate-900 mt-1">Church Member Registration</h1>
                 <p className="text-xs text-slate-500 mt-1">
-                  Connect with the congregation, church leadership, and weekly duty rosters.
+                  Connect with church leadership and weekly duty rosters. Submissions are reviewed before public listing.
                 </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5 text-xs">
-                {/* PHOTO UPLOAD & PREVIEW */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <div className="w-20 h-20 rounded-full bg-slate-200 border-2 border-blue-600 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
                     {photoPreview ? (
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1 text-center sm:text-left flex-1">
                     <label className="block font-bold text-slate-800">Profile Photo</label>
-                    <p className="text-[11px] text-slate-500">Attach a portrait or selfie (optional).</p>
+                    <p className="text-[11px] text-slate-500">Attach a clear portrait or selfie (optional).</p>
                     <input
                       type="file"
                       accept="image/*"
@@ -229,7 +229,7 @@ export default function RegisterPage() {
                     type="submit"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-md shadow-blue-600/20 active:scale-[0.99]"
                   >
-                    Submit Member Registration
+                    Submit for Approval
                   </button>
                 </div>
               </form>
