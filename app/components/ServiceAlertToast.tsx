@@ -4,110 +4,85 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface ServiceWorship {
-  role: string;
-  assignedTo: string;
-}
-
-interface ServiceSchedule {
+interface ScheduledServiceItem {
+  id: string;
+  serviceType: string;
   title: string;
   time: string;
-  enabled: boolean;
-  duties: ServiceWorship[];
-}
-
-interface WeekSchedule {
-  dateRange: string;
-  midweek: ServiceSchedule;
-  vespers: ServiceSchedule;
-  sabbathSchool: ServiceSchedule;
-  divineWorship: ServiceSchedule;
-  ay: ServiceSchedule;
+  date: string;
+  duties: { role: string; assignedTo: string }[];
 }
 
 export default function ServiceAlertToast() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
-  const [scheduleTitle, setScheduleTitle] = useState("");
-  const [statusBadge, setStatusBadge] = useState("");
+  const [nearest, setNearest] = useState<ScheduledServiceItem | null>(null);
+  const [badgeText, setBadgeText] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
-    const checkSchedule = () => {
-      const savedSchedule = localStorage.getItem("church_Worship_schedule");
-      if (!savedSchedule) {
+    const raw = localStorage.getItem("church_multi_schedules");
+    if (!raw) {
+      setVisible(false);
+      return;
+    }
+
+    try {
+      const list: ScheduledServiceItem[] = JSON.parse(raw);
+      const now = new Date();
+
+      // Filter active (today or future)
+      const valid = list.filter((item) => {
+        if (!item.date) return false;
+        const endOfDay = new Date(item.date);
+        endOfDay.setHours(23, 59, 59, 999);
+        return now.getTime() <= endOfDay.getTime();
+      });
+
+      if (valid.length === 0) {
         setVisible(false);
         return;
       }
 
-      try {
-        const schedule: WeekSchedule = JSON.parse(savedSchedule);
+      // Sort by closest date
+      valid.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const nextUp = valid[0];
+      setNearest(nextUp);
 
-        const serviceKeys = ["midweek", "vespers", "sabbathSchool", "divineWorship", "ay"] as const;
-        const hasActiveService = serviceKeys.some((k) => schedule[k]?.enabled === true);
+      const target = new Date(nextUp.date);
+      const isSameDay =
+        now.getFullYear() === target.getFullYear() &&
+        now.getMonth() === target.getMonth() &&
+        now.getDate() === target.getDate();
 
-        // Hide if no services are active or header was wiped
-        if (!hasActiveService || !schedule.dateRange) {
-          setVisible(false);
-          return;
-        }
+      const diffHours = (target.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-        const header = schedule.dateRange;
-        setScheduleTitle(header);
-
-        const datePart = header.includes("|") ? header.split("|")[1].trim() : header;
-        const targetDate = new Date(datePart);
-
-        if (!isNaN(targetDate.getTime())) {
-          const now = new Date();
-          const endOfDay = new Date(targetDate);
-          endOfDay.setHours(23, 59, 59, 999);
-
-          // Day passed
-          if (now.getTime() > endOfDay.getTime()) {
-            setVisible(false);
-            return;
-          }
-
-          const isSameDay =
-            now.getFullYear() === targetDate.getFullYear() &&
-            now.getMonth() === targetDate.getMonth() &&
-            now.getDate() === targetDate.getDate();
-
-          const diffHours = (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-          if (isSameDay) {
-            setStatusBadge("🔴 Happening Today!");
-            setIsUrgent(true);
-            setVisible(true);
-          } else if (diffHours > 0 && diffHours <= 24) {
-            setStatusBadge("⚡ Tomorrow / In < 24 Hours");
-            setIsUrgent(true);
-            setVisible(true);
-          } else if (diffHours > 24 && diffHours <= 72) {
-            const days = Math.ceil(diffHours / 24);
-            setStatusBadge(`⏳ In ${days} Days`);
-            setIsUrgent(false);
-            setVisible(true);
-          } else {
-            setStatusBadge("🗓️ Upcoming Service");
-            setIsUrgent(false);
-            setVisible(true);
-          }
-        } else {
-          setStatusBadge("🗓️ Active Worship Schedule");
-          setVisible(true);
-        }
-      } catch (e) {
-        setVisible(false);
+      if (isSameDay) {
+        setBadgeText("🔴 Happening Today!");
+        setIsUrgent(true);
+      } else if (diffHours > 0 && diffHours <= 24) {
+        setBadgeText("⚡ Tomorrow / In < 24h");
+        setIsUrgent(true);
+      } else if (diffHours > 24 && diffHours <= 72) {
+        setBadgeText(`⏳ In ${Math.ceil(diffHours / 24)} Days`);
+        setIsUrgent(false);
+      } else {
+        setBadgeText("🗓️ Next Service");
+        setIsUrgent(false);
       }
-    };
 
-    checkSchedule();
+      setVisible(true);
+    } catch (e) {
+      setVisible(false);
+    }
   }, [pathname]);
 
-  // NEVER show the alert badge while the admin is working or viewing /schedule
-  if (!visible || pathname === "/schedule" || pathname === "/admin") return null;
+  if (!visible || !nearest || pathname === "/schedule" || pathname === "/admin") return null;
+
+  const formattedDate = new Date(nearest.date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <aside
@@ -123,36 +98,26 @@ export default function ServiceAlertToast() {
       >
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
-            <span
-              className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                isUrgent ? "bg-rose-600" : "bg-blue-400"
-              }`}
-            ></span>
-            <span
-              className={`relative inline-flex rounded-full h-3 w-3 ${
-                isUrgent ? "bg-rose-600" : "bg-blue-500"
-              }`}
-            ></span>
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+              isUrgent ? "bg-rose-600" : "bg-blue-400"
+            }`} />
+            <span className={`relative inline-flex rounded-full h-3 w-3 ${
+              isUrgent ? "bg-rose-600" : "bg-blue-500"
+            }`} />
           </span>
-          <span
-            className={`text-[11px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded ${
-              isUrgent ? "bg-black/20 text-slate-950" : "bg-blue-600/30 text-blue-300"
-            }`}
-          >
-            {statusBadge}
+          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+            isUrgent ? "bg-black/20 text-slate-950" : "bg-blue-600/30 text-blue-300"
+          }`}>
+            {badgeText}
           </span>
         </div>
 
         <div>
-          <h4 className="font-bold text-sm leading-tight line-clamp-2 mt-1">
-            {scheduleTitle || "Active Worship Service"}
+          <h4 className="font-bold text-sm leading-tight line-clamp-1 mt-1">
+            {nearest.serviceType} • {formattedDate}
           </h4>
-          <p
-            className={`text-xs mt-1 leading-relaxed ${
-              isUrgent ? "text-slate-900 font-medium" : "text-slate-300"
-            }`}
-          >
-            Active schedule roster. Please review Worship assignments.
+          <p className={`text-xs mt-0.5 leading-relaxed ${isUrgent ? "text-slate-950 font-medium" : "text-slate-300"}`}>
+            {nearest.title} ({nearest.time})
           </p>
         </div>
 
@@ -165,7 +130,7 @@ export default function ServiceAlertToast() {
                 : "bg-blue-600 text-white hover:bg-blue-500"
             }`}
           >
-            View Worship Roster &rarr;
+            View Duty Roster &rarr;
           </Link>
           <span className="text-[10px] opacity-75">Tubod SDA</span>
         </div>
