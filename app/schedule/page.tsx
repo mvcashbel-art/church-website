@@ -3,115 +3,57 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-interface ServiceWorship {
-  role: string;
-  assignedTo: string;
-}
-
-interface ServiceSchedule {
+export interface ScheduledServiceItem {
+  id: string;
+  serviceType: string;
   title: string;
   time: string;
-  enabled: boolean;
-  duties: ServiceWorship[];
+  date: string; // YYYY-MM-DD
+  duties: { role: string; assignedTo: string }[];
 }
-
-interface WeekSchedule {
-  dateRange: string;
-  midweek: ServiceSchedule;
-  vespers: ServiceSchedule;
-  sabbathSchool: ServiceSchedule;
-  divineWorship: ServiceSchedule;
-  ay: ServiceSchedule;
-}
-
-const DEFAULT_SCHEDULE: WeekSchedule = {
-  dateRange: "Midweek Worship | September 9, 2026",
-  midweek: {
-    title: "Wednesday Prayer Meeting",
-    time: "Wednesday - 6:30 PM",
-    enabled: true,
-    duties: [
-      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder" },
-      { role: "Devotional Speaker", assignedTo: "Assigned Speaker" },
-      { role: "Intercessory Prayer", assignedTo: "Prayer Ministry" },
-    ],
-  },
-  vespers: {
-    title: "Friday Vesper Worship",
-    time: "Friday - 6:30 PM",
-    enabled: false,
-    duties: [
-      { role: "Song Leader", assignedTo: "Music Ministry" },
-      { role: "Devotional Message", assignedTo: "Assigned Speaker" },
-      { role: "Opening / Closing Prayer", assignedTo: "Assigned Member" },
-    ],
-  },
-  sabbathSchool: {
-    title: "Sabbath School",
-    time: "Saturday - 8:30 AM",
-    enabled: false,
-    duties: [
-      { role: "Superintendent", assignedTo: "SS Superintendent" },
-      { role: "Song Leader / Chorister", assignedTo: "Music Ministry" },
-      { role: "Mission Story Reader", assignedTo: "Youth Volunteer" },
-      { role: "Lesson Teachers", assignedTo: "Class Teachers" },
-    ],
-  },
-  divineWorship: {
-    title: "Divine Worship Service",
-    time: "Saturday - 10:30 AM",
-    enabled: false,
-    duties: [
-      { role: "Platform Elder", assignedTo: "First Elder" },
-      { role: "Preacher / Speaker", assignedTo: "Church Pastor / Elder" },
-      { role: "Scripture Reading", assignedTo: "Youth Reader" },
-      { role: "Pastoral Prayer", assignedTo: "Ordained Elder" },
-      { role: "Offertory / Deacons", assignedTo: "Head Deacon & Team" },
-    ],
-  },
-  ay: {
-    title: "Adventist Youth (AY) Service",
-    time: "Saturday - 3:30 PM",
-    enabled: false,
-    duties: [
-      { role: "AY Program Leader", assignedTo: "AY Sponsor" },
-      { role: "Song Service", assignedTo: "AY Praise Team" },
-      { role: "Special Musical Item", assignedTo: "Choir / Soloist" },
-      { role: "Vespers / Closing Sunset", assignedTo: "AY Leader" },
-    ],
-  },
-};
 
 export default function SchedulePage() {
-  const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
+  const [services, setServices] = useState<ScheduledServiceItem[]>([]);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("church_Worship_schedule");
+    const saved = localStorage.getItem("church_multi_schedules");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
+        const parsed: ScheduledServiceItem[] = JSON.parse(saved);
+        const now = new Date();
+
+        // Filter out services where the day has already completely passed (after 11:59:59 PM)
+        const active = parsed.filter((item) => {
+          if (!item.date) return true;
+          const endOfDay = new Date(item.date);
+          endOfDay.setHours(23, 59, 59, 999);
+          return now.getTime() <= endOfDay.getTime();
+        });
+
+        // Sort ascending: closest date first
+        active.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        setServices(active);
       } catch (e) {}
     }
   }, []);
 
-  const serviceKeys = ["midweek", "vespers", "sabbathSchool", "divineWorship", "ay"] as const;
-  const activeServices = serviceKeys.filter((key) => schedule[key]?.enabled === true);
-
   const handleCopy = () => {
-    let text = `✝ Tubod Seventh-day Adventist Church\n📅 ${schedule.dateRange}\n\n`;
+    if (services.length === 0) return;
+    let text = `✝ Tubod Seventh-day Adventist Church - Upcoming Duties\n\n`;
 
-    activeServices.forEach((key) => {
-      const s = schedule[key];
-      text += `--- ${s.title.toUpperCase()} (${s.time}) ---\n`;
+    services.forEach((s) => {
+      const formattedDate = s.date
+        ? new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "Upcoming";
+      text += `📅 ${s.serviceType.toUpperCase()} (${formattedDate} - ${s.time})\n`;
       s.duties.forEach((d) => {
-        text += `• ${d.role}: ${d.assignedTo}\n`;
+        text += `• ${d.role}: ${d.assignedTo || "—"}\n`;
       });
       text += `\n`;
     });
 
-    text += `Please check your assignments. God bless! 🙏`;
+    text += `Please review your assignments. God bless! 🙏`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -140,46 +82,74 @@ export default function SchedulePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 pt-10">
-        <div className="text-center space-y-2 mb-8">
+        <div className="text-center space-y-2 mb-10">
           <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-[11px] tracking-wider uppercase">
-            Worship Participation & Officers
+            Active Worship Rosters
           </span>
           <h1 className="text-3xl sm:text-4xl font-black text-slate-900">
-            {schedule.dateRange || "Church Worship Schedule"}
+            Upcoming Worship Services
           </h1>
           <p className="text-xs sm:text-sm text-slate-500">
-            Assigned roles and Worship roster for this service
+            Sorted chronologically by nearest schedule. Automatically clears once service day concludes.
           </p>
         </div>
 
-        {activeServices.length === 0 ? (
+        {services.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center max-w-md mx-auto shadow-xs">
             <span className="text-3xl">🗓️</span>
-            <h3 className="font-bold text-slate-800 mt-2">No Service Currently Active</h3>
+            <h3 className="font-bold text-slate-800 mt-2">No Active Upcoming Services</h3>
             <p className="text-xs text-slate-500 mt-1">
-              The church administrator has not enabled a Worship schedule for this day yet.
+              All previous services have finished. New rosters will appear here when scheduled by the church clerk.
             </p>
           </div>
         ) : (
-          <div className={`grid gap-6 ${activeServices.length === 1 ? "max-w-2xl mx-auto" : "md:grid-cols-2"}`}>
-            {activeServices.map((key) => {
-              const item = schedule[key];
+          <div className="space-y-8">
+            {services.map((item, index) => {
+              const formattedDate = item.date
+                ? new Date(item.date).toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Upcoming Service";
+
+              const isNearest = index === 0;
+
               return (
                 <div
-                  key={key}
-                  className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden flex flex-col"
+                  key={item.id}
+                  className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition-all ${
+                    isNearest ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-200/80"
+                  }`}
                 >
-                  <div className="bg-slate-950 text-white px-5 py-3.5 flex justify-between items-center">
-                    <h2 className="font-bold text-sm tracking-wide">{item.title}</h2>
-                    <span className="text-xs text-blue-300 font-semibold">{item.time}</span>
+                  <div className={`px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                    isNearest ? "bg-blue-950 text-white" : "bg-slate-900 text-white"
+                  }`}>
+                    <div>
+                      {isNearest && (
+                        <span className="inline-block bg-amber-400 text-amber-950 font-black text-[10px] uppercase px-2 py-0.5 rounded tracking-wide mb-1">
+                          ⚡ Next Upcoming Service
+                        </span>
+                      )}
+                      <h2 className="font-bold text-base tracking-wide flex items-center gap-2">
+                        <span>{item.serviceType}</span>
+                        <span className="opacity-60">•</span>
+                        <span className="text-xs text-blue-200 font-normal">{item.title}</span>
+                      </h2>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs font-bold text-blue-300">{formattedDate}</div>
+                      <div className="text-[11px] text-slate-300">{item.time}</div>
+                    </div>
                   </div>
 
-                  <div className="p-5 divide-y divide-slate-100 flex-1 flex flex-col justify-around text-xs sm:text-sm">
-                    {item.duties.map((Worship, idx) => (
-                      <div key={idx} className="py-2.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                        <span className="text-slate-600 font-medium">{Worship.role}</span>
-                        <span className="font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200/60 text-right">
-                          {Worship.assignedTo || "—"}
+                  <div className="p-6 grid sm:grid-cols-2 gap-3 text-xs sm:text-sm divide-y sm:divide-y-0 divide-slate-100">
+                    {item.duties.map((duty, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-600 font-medium">{duty.role}</span>
+                        <span className="font-bold text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200 text-right">
+                          {duty.assignedTo || "—"}
                         </span>
                       </div>
                     ))}
