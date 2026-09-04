@@ -32,10 +32,9 @@ export default function ChurchHome() {
 
   useEffect(() => {
     const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents) {
+    if (savedEvents !== null) {
       try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed.length > 0) setEvents(parsed);
+        setEvents(JSON.parse(savedEvents));
       } catch (e) {}
     }
     const savedBanner = localStorage.getItem("church_banner");
@@ -195,37 +194,43 @@ export default function ChurchHome() {
           </Link>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((ev) => (
-            <div
-              key={ev.id}
-              className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
-            >
-              {ev.image ? (
-                <div className="relative h-48 w-full overflow-hidden bg-slate-100">
-                  <img
-                    src={ev.image}
-                    alt={ev.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-              ) : (
-                <div className="h-40 bg-blue-50/50 flex items-center justify-center text-blue-400 text-xs font-medium">
-                  Tubod SDA Sanctuary
-                </div>
-              )}
-              <div className="p-5 flex-1 flex flex-col justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-blue-600 tracking-wide uppercase">{ev.date}</span>
-                  <h3 className="text-base font-bold text-slate-900 mt-1 group-hover:text-blue-600 transition-colors">
-                    {ev.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">{ev.desc}</p>
+        {events.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500 text-xs">
+            No highlights or events posted right now. Use the Admin Portal to upload new events.
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((ev) => (
+              <div
+                key={ev.id}
+                className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+              >
+                {ev.image ? (
+                  <div className="relative h-48 w-full overflow-hidden bg-slate-100">
+                    <img
+                      src={ev.image}
+                      alt={ev.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-40 bg-blue-50/50 flex items-center justify-center text-blue-400 text-xs font-medium">
+                    Tubod SDA Sanctuary
+                  </div>
+                )}
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-blue-600 tracking-wide uppercase">{ev.date}</span>
+                    <h3 className="text-base font-bold text-slate-900 mt-1 group-hover:text-blue-600 transition-colors">
+                      {ev.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">{ev.desc}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 6. MEMBER REGISTRATION */}
