@@ -31,16 +31,6 @@ interface Member {
 }
 
 const SERVICE_TEMPLATES: Record<string, { title: string; defaultTime: string; roles: string[] }> = {
-  "Midweek Prayer Meeting": {
-    title: "Wednesday Midweek Gathering",
-    defaultTime: "Wednesday - 6:30 PM",
-    roles: ["Leader / Moderator", "Devotional Speaker", "Intercessory Prayer"],
-  },
-  "Friday Vesper Worship": {
-    title: "Friday Sunset Welcome",
-    defaultTime: "Friday - 6:30 PM",
-    roles: ["Song Leader", "Devotional Message", "Opening / Closing Prayer"],
-  },
   "Sabbath School": {
     title: "Sabbath Morning Bible Study & Lesson",
     defaultTime: "Saturday - 8:30 AM",
@@ -65,6 +55,16 @@ const SERVICE_TEMPLATES: Record<string, { title: string; defaultTime: string; ro
       "Head Deacon",
       "Head Deaconess",
     ],
+  },
+  "Midweek Prayer Meeting": {
+    title: "Wednesday Midweek Gathering",
+    defaultTime: "Wednesday - 6:30 PM",
+    roles: ["Leader / Moderator", "Devotional Speaker", "Intercessory Prayer"],
+  },
+  "Friday Vesper Worship": {
+    title: "Friday Sunset Welcome",
+    defaultTime: "Friday - 6:30 PM",
+    roles: ["Song Leader", "Devotional Message", "Opening / Closing Prayer"],
   },
   "Adventist Youth (AY) Program": {
     title: "Saturday Afternoon Youth Fellowship",
@@ -97,11 +97,11 @@ export default function AdminDashboard() {
   const [members, setMembers] = useState<Member[]>([]);
   const [bannerNotice, setBannerNotice] = useState("");
 
-  // Schedule form state
-  const [chosenType, setChosenType] = useState("Midweek Prayer Meeting");
+  // Create form state
+  const [chosenType, setChosenType] = useState("Sabbath School");
   const [serviceDate, setServiceDate] = useState("");
   const [serviceDuties, setServiceDuties] = useState<{ role: string; assignedTo: string }[]>(
-    SERVICE_TEMPLATES["Midweek Prayer Meeting"].roles.map((r) => ({ role: r, assignedTo: "" }))
+    SERVICE_TEMPLATES["Sabbath School"].roles.map((r) => ({ role: r, assignedTo: "" }))
   );
 
   // Event form state
@@ -112,12 +112,47 @@ export default function AdminDashboard() {
   const [videoUrl, setVideoUrl] = useState("");
 
   useEffect(() => {
+    let combinedList: ScheduledServiceItem[] = [];
+
+    // 1. Load multi schedules
     const savedSchedules = localStorage.getItem("church_multi_schedules");
     if (savedSchedules) {
       try {
-        setSchedules(JSON.parse(savedSchedules));
+        combinedList = JSON.parse(savedSchedules);
       } catch (e) {}
     }
+
+    // 2. Clear out the phantom legacy schedule by importing it once so it can be managed/deleted
+    const savedLegacy = localStorage.getItem("church_duty_schedule");
+    if (savedLegacy) {
+      try {
+        const leg = JSON.parse(savedLegacy);
+        const legacyKeys = ["midweek", "vespers", "sabbathSchool", "divineWorship", "ay"] as const;
+        const legacyDate = leg.dateRange?.includes("|") ? leg.dateRange.split("|")[1].trim() : "2026-09-09";
+
+        legacyKeys.forEach((k) => {
+          if (leg[k]?.enabled) {
+            // Only add if not already in multi list
+            if (!combinedList.some((item) => item.serviceType === leg[k].title)) {
+              combinedList.push({
+                id: `legacy-${k}-${Date.now()}`,
+                serviceType: leg[k].title,
+                title: leg[k].title,
+                time: leg[k].time,
+                date: legacyDate,
+                duties: leg[k].duties || [],
+              });
+            }
+          }
+        });
+        // Remove legacy key so it never ghosts again
+        localStorage.removeItem("church_duty_schedule");
+        localStorage.setItem("church_multi_schedules", JSON.stringify(combinedList));
+      } catch (e) {}
+    }
+
+    combinedList.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    setSchedules(combinedList);
 
     const savedEvents = localStorage.getItem("church_events");
     if (savedEvents !== null) {
@@ -157,7 +192,7 @@ export default function AdminDashboard() {
   const handleAddSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceDate) {
-      alert("Please choose a calendar date for this service.");
+      alert("Please select a date for this service.");
       return;
     }
 
@@ -178,22 +213,23 @@ export default function AdminDashboard() {
     localStorage.setItem("church_multi_schedules", JSON.stringify(updated));
 
     const top = updated[0];
-    const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - Duty roster active!`;
+    const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - Please check the Worship roster for your assignments!`;
     localStorage.setItem("church_banner", autoBanner);
     setBannerNotice(autoBanner);
 
-    alert(`${chosenType} schedule published!`);
+    alert(`${chosenType} published!`);
     setServiceDate("");
   };
 
   const handleDeleteSchedule = (id: string) => {
+    if (!confirm("Are you sure you want to delete this worship schedule?")) return;
     const updated = schedules.filter((s) => s.id !== id);
     setSchedules(updated);
     localStorage.setItem("church_multi_schedules", JSON.stringify(updated));
 
     if (updated.length > 0) {
       const top = updated[0];
-      const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+      const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - Please check the Worship roster for your assignments!`;
       localStorage.setItem("church_banner", autoBanner);
       setBannerNotice(autoBanner);
     } else {
@@ -202,6 +238,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUpdateAssignedDuty = (scheduleId: string, dutyIdx: number, val: string) => {
+    const updated = schedules.map((item) => {
+      if (item.id === scheduleId) {
+        const nextDuties = [...item.duties];
+        nextDuties[dutyIdx].assignedTo = val;
+        return { ...item, duties: nextDuties };
+      }
+      return item;
+    });
+    setSchedules(updated);
+    localStorage.setItem("church_multi_schedules", JSON.stringify(updated));
+  };
+
+  const handleWipeAllSchedules = () => {
+    if (confirm("Delete ALL active schedules and alerts? This clears the entire schedule page.")) {
+      setSchedules([]);
+      localStorage.removeItem("church_multi_schedules");
+      localStorage.removeItem("church_duty_schedule");
+      localStorage.removeItem("church_banner");
+      setBannerNotice("");
+      alert("All schedules wiped clean.");
+    }
+  };
+
+  // Events
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle || !eventDesc) return;
@@ -234,9 +295,7 @@ export default function AdminDashboard() {
   };
 
   const handleDepartmentChange = (memberId: number, newDept: string) => {
-    const updated = members.map((m) =>
-      m.id === memberId ? { ...m, department: newDept } : m
-    );
+    const updated = members.map((m) => (m.id === memberId ? { ...m, department: newDept } : m));
     setMembers(updated);
     localStorage.setItem("church_members", JSON.stringify(updated));
   };
@@ -308,13 +367,24 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* 1. SCHEDULED SERVICES QUEUE */}
+        {/* 1. MANAGE & EDIT ACTIVE SCHEDULES (WITH DELETE & ROLE EDITING) */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div className="border-b pb-3 border-slate-100">
-            <h2 className="text-base font-bold text-slate-800">Active Scheduled Services ({schedules.length})</h2>
-            <p className="text-xs text-slate-500">
-              Sorted chronologically by nearest date. Passed services auto-expire at midnight.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
+            <div>
+              <h2 className="text-base font-bold text-slate-800">Manage & Edit Active Schedules ({schedules.length})</h2>
+              <p className="text-xs text-slate-500">
+                Edit member assignments directly or delete any service. Nearest date appears at the top.
+              </p>
+            </div>
+            {schedules.length > 0 && (
+              <button
+                type="button"
+                onClick={handleWipeAllSchedules}
+                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+              >
+                Clear All Schedules
+              </button>
+            )}
           </div>
 
           {schedules.length === 0 ? (
@@ -322,22 +392,42 @@ export default function AdminDashboard() {
               No services currently active. Schedule a service below.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {schedules.map((s, idx) => (
-                <div key={s.id} className="p-4 border border-slate-200 rounded-xl flex items-center justify-between bg-slate-50">
-                  <div>
-                    <span className="text-[10px] font-bold text-blue-700 uppercase bg-blue-100 px-2 py-0.5 rounded">
-                      {idx === 0 ? "⚡ Nearest Upcoming (On Top)" : "Queued"}
-                    </span>
-                    <h4 className="text-sm font-bold text-slate-900 mt-1">{s.serviceType}</h4>
-                    <p className="text-xs text-slate-500">{s.date} • {s.time}</p>
+                <div key={s.id} className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
+                  <div className="flex items-center justify-between border-b pb-2 border-slate-200">
+                    <div>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                        idx === 0 ? "bg-amber-300 text-amber-950 font-black" : "bg-blue-100 text-blue-800"
+                      }`}>
+                        {idx === 0 ? "⚡ Nearest Upcoming (On Top)" : "Queued"}
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-900 mt-1">{s.serviceType}</h4>
+                      <p className="text-xs text-slate-500">{s.date} • {s.time}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSchedule(s.id)}
+                      className="text-xs text-rose-600 hover:bg-rose-100 bg-white border border-rose-300 px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"
+                    >
+                      <span>🗑️</span> Delete Service
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDeleteSchedule(s.id)}
-                    className="text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg font-semibold"
-                  >
-                    🗑️ Delete
-                  </button>
+
+                  {/* INLINE DUTY EDITORS */}
+                  <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                    {s.duties.map((duty, dIdx) => (
+                      <div key={dIdx} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200">
+                        <span className="w-40 font-semibold text-slate-600 truncate">{duty.role}</span>
+                        <input
+                          type="text"
+                          placeholder="Type assigned name..."
+                          value={duty.assignedTo}
+                          onChange={(e) => handleUpdateAssignedDuty(s.id, dIdx, e.target.value)}
+                          className="flex-1 bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-600"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -347,9 +437,9 @@ export default function AdminDashboard() {
         {/* 2. SCHEDULE AN INDIVIDUAL SERVICE FORM */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="border-b pb-3 border-slate-100">
-            <h2 className="text-base font-bold text-slate-800">+ Schedule an Individual Service</h2>
+            <h2 className="text-base font-bold text-slate-800">+ Schedule a New Service</h2>
             <p className="text-xs text-slate-500">
-              Create a distinct service with its own calendar date. Select Sabbath School or Divine Worship independently.
+              Pick Sabbath School, Divine Worship, or Midweek, pick the date, and assign officers.
             </p>
           </div>
 
@@ -468,7 +558,7 @@ export default function AdminDashboard() {
               <input
                 type="text"
                 required
-                placeholder="Adventist Youth Fellowship & Music"
+                placeholder="Youth Fellowship & Music"
                 value={eventTitle}
                 onChange={(e) => setEventTitle(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
