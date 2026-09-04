@@ -28,7 +28,7 @@ const DEFAULT_EVENTS: ChurchEvent[] = [
 
 export default function ChurchHome() {
   const [events, setEvents] = useState<ChurchEvent[]>(DEFAULT_EVENTS);
-  const [banner, setBanner] = useState("📢 Happy Preparation Day! Sabbath worship begins tomorrow at 8:30 AM.");
+  const [banner, setBanner] = useState("📢 Upcoming: Midweek Worship | September 9, 2026 - Please check the duty roster for your assignments!");
 
   useEffect(() => {
     const savedEvents = localStorage.getItem("church_events");
@@ -46,16 +46,16 @@ export default function ChurchHome() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-200 selection:text-blue-900">
-      {/* 1. TOP ANNOUNCEMENT BANNER */}
-<div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
-  <span className="inline-flex items-center gap-2">
-    <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
-    {banner}
-  </span>
-</div>
+      {/* 1. HIGH-VISIBILITY YELLOW ANNOUNCEMENT BANNER */}
+      <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
+        <span className="inline-flex items-center gap-2">
+          <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
+          {banner}
+        </span>
+      </div>
 
-      {/* 2. BRIGHT WHITE & BLUE HEADER */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+      {/* 2. BRIGHT HEADER */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white text-lg shadow-md shadow-blue-500/20">
@@ -83,7 +83,7 @@ export default function ChurchHome() {
           <div className="flex items-center gap-3">
             <Link
               href="/register"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md hover:shadow-blue-600/20 active:scale-95"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-xs hover:shadow-md hover:shadow-blue-600/20 active:scale-95"
             >
               Member Portal
             </Link>
@@ -91,7 +91,7 @@ export default function ChurchHome() {
         </div>
       </header>
 
-      {/* 3. LIGHT BLUE GRADIENT HERO */}
+      {/* 3. LIGHT BLUE HERO */}
       <section className="relative overflow-hidden pt-16 pb-24 px-4 text-center bg-gradient-to-b from-blue-100/60 via-blue-50/40 to-slate-50">
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-blue-200 bg-white text-blue-700 text-xs font-semibold shadow-xs">
@@ -114,7 +114,7 @@ export default function ChurchHome() {
               href="/schedule"
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
             >
-              <span>📋</span> View Weekly Worship Schedule
+              <span>📋</span> View Weekly Duty Roster
             </Link>
             <a
               href="#services"
@@ -129,7 +129,7 @@ export default function ChurchHome() {
       {/* 4. SERVICE HOURS & LOCATION */}
       <section id="services" className="py-8 px-4 max-w-6xl mx-auto w-full -mt-10 relative z-20">
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-sm">
+          <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-xs">
             <div className="flex items-center gap-3 mb-5">
               <span className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 text-xl">
                 ⏳
@@ -159,7 +159,7 @@ export default function ChurchHome() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-sm flex flex-col justify-between">
+          <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-3 mb-5">
                 <span className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 text-xl">
@@ -228,7 +228,7 @@ export default function ChurchHome() {
         </div>
       </section>
 
-      {/* 6. MEMBER REGISTRATION CTA */}
+      {/* 6. MEMBER REGISTRATION */}
       <section id="community" className="py-14 px-4 bg-white border-y border-slate-200/80 my-8">
         <div className="max-w-3xl mx-auto text-center space-y-4">
           <span className="inline-block p-3 rounded-2xl bg-blue-50 text-blue-600 text-2xl">
@@ -241,7 +241,7 @@ export default function ChurchHome() {
           <div className="pt-2">
             <Link
               href="/register"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-6 py-3 rounded-xl transition-all inline-block shadow-sm hover:shadow-md hover:shadow-blue-600/20"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-6 py-3 rounded-xl transition-all inline-block shadow-xs hover:shadow-md hover:shadow-blue-600/20"
             >
               Register Membership &rarr;
             </Link>
@@ -249,7 +249,7 @@ export default function ChurchHome() {
         </div>
       </section>
 
-      {/* 7. CLEAN WHITE FOOTER */}
+      {/* 7. FOOTER */}
       <footer className="mt-auto bg-white border-t border-slate-200 py-8 px-4 text-center text-xs text-slate-500">
         <p>&copy; {new Date().getFullYear()} Tubod Seventh-day Adventist Church. All rights reserved.</p>
         <div className="mt-3 flex justify-center gap-4 text-[11px]">
