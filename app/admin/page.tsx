@@ -48,7 +48,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Wednesday - 6:30 PM",
     enabled: true,
     duties: [
-      { role: "Leader / Moderator", assignedTo: "Elder on Duty" },
+      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder" },
       { role: "Devotional Speaker", assignedTo: "Assigned Speaker" },
       { role: "Intercessory Prayer", assignedTo: "Prayer Ministry" },
     ],
@@ -56,7 +56,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   vespers: {
     title: "Friday Vesper Worship",
     time: "Friday - 6:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Song Leader", assignedTo: "Music Ministry" },
       { role: "Devotional Message", assignedTo: "Assigned Speaker" },
@@ -66,7 +66,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   sabbathSchool: {
     title: "Sabbath School",
     time: "Saturday - 8:30 AM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Superintendent", assignedTo: "SS Superintendent" },
       { role: "Song Leader / Chorister", assignedTo: "Music Ministry" },
@@ -77,7 +77,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   divineWorship: {
     title: "Divine Worship Service",
     time: "Saturday - 10:30 AM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Platform Elder", assignedTo: "First Elder" },
       { role: "Preacher / Speaker", assignedTo: "Church Pastor / Elder" },
@@ -89,7 +89,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   ay: {
     title: "Adventist Youth (AY) Service",
     time: "Saturday - 3:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "AY Program Leader", assignedTo: "AY Sponsor" },
       { role: "Song Service", assignedTo: "AY Praise Team" },
@@ -98,6 +98,21 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     ],
   },
 };
+
+const DEFAULT_EVENTS: ChurchEvent[] = [
+  {
+    id: 1,
+    title: "Sabbath School & Divine Worship",
+    date: "Every Saturday - 8:30 AM",
+    desc: "Join us for morning worship, lesson study, and fellowship luncheon.",
+  },
+  {
+    id: 2,
+    title: "Adventist Youth (AY) Fellowship",
+    date: "Saturday - 3:30 PM",
+    desc: "Praise music, discussions, and spiritual activities for youth of all ages.",
+  }
+];
 
 const DEPARTMENTS = [
   "Regular Church Member",
@@ -118,7 +133,7 @@ export default function AdminDashboard() {
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
 
-  const [events, setEvents] = useState<ChurchEvent[]>([]);
+  const [events, setEvents] = useState<ChurchEvent[]>(DEFAULT_EVENTS);
   const [members, setMembers] = useState<Member[]>([]);
   const [bannerNotice, setBannerNotice] = useState("");
   const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
@@ -133,7 +148,12 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents) setEvents(JSON.parse(savedEvents));
+    if (savedEvents) {
+      try {
+        const parsed = JSON.parse(savedEvents);
+        if (parsed.length > 0) setEvents(parsed);
+      } catch (e) {}
+    }
 
     const savedMembers = localStorage.getItem("church_members");
     if (savedMembers) setMembers(JSON.parse(savedMembers));
@@ -145,8 +165,7 @@ export default function AdminDashboard() {
     if (savedSchedule) {
       try {
         const parsed = JSON.parse(savedSchedule);
-        const normalized = { ...DEFAULT_SCHEDULE, ...parsed };
-        setSchedule(normalized);
+        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
       } catch (e) {}
     }
   }, []);
@@ -192,12 +211,15 @@ export default function AdminDashboard() {
     setDate("");
     setDesc("");
     setImagePreview("");
+    alert("Event published!");
   };
 
   const handleDeleteEvent = (id: number) => {
-    const updated = events.filter((item) => item.id !== id);
-    setEvents(updated);
-    localStorage.setItem("church_events", JSON.stringify(updated));
+    if (confirm("Are you sure you want to delete this event/highlight?")) {
+      const updated = events.filter((item) => item.id !== id);
+      setEvents(updated);
+      localStorage.setItem("church_events", JSON.stringify(updated));
+    }
   };
 
   const handleDepartmentChange = (memberId: number, newDept: string) => {
@@ -209,9 +231,11 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteMember = (id: number) => {
-    const updated = members.filter((m) => m.id !== id);
-    setMembers(updated);
-    localStorage.setItem("church_members", JSON.stringify(updated));
+    if (confirm("Remove this member from the directory?")) {
+      const updated = members.filter((m) => m.id !== id);
+      setMembers(updated);
+      localStorage.setItem("church_members", JSON.stringify(updated));
+    }
   };
 
   const handleToggleService = (serviceKey: keyof Omit<WeekSchedule, "dateRange">) => {
@@ -230,32 +254,55 @@ export default function AdminDashboard() {
     setSchedule(updated);
   };
 
-  const handleDatePick = (chosenDate: string, servicePrefix: string) => {
-    setSelectedDate(chosenDate);
-    if (!chosenDate) return;
+  const applyPresetServices = (serviceType: string, chosenDate: string) => {
+    const updated: WeekSchedule = { ...schedule };
 
-    const parsedDate = new Date(chosenDate);
-    const formatted = parsedDate.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+    updated.midweek.enabled = false;
+    updated.vespers.enabled = false;
+    updated.sabbathSchool.enabled = false;
+    updated.divineWorship.enabled = false;
+    updated.ay.enabled = false;
 
-    const newHeader = `${servicePrefix} | ${formatted}`;
-    const autoBanner = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
+    if (serviceType === "Midweek Worship") {
+      updated.midweek.enabled = true;
+    } else if (serviceType === "Friday Vespers") {
+      updated.vespers.enabled = true;
+    } else if (serviceType === "Sabbath Worship Day") {
+      updated.sabbathSchool.enabled = true;
+      updated.divineWorship.enabled = true;
+      updated.ay.enabled = true;
+    } else if (serviceType === "AY Ministry Program") {
+      updated.ay.enabled = true;
+    } else {
+      updated.midweek.enabled = true;
+      updated.vespers.enabled = true;
+      updated.sabbathSchool.enabled = true;
+      updated.divineWorship.enabled = true;
+      updated.ay.enabled = true;
+    }
 
-    const updatedSchedule = { ...schedule, dateRange: newHeader };
-    setSchedule(updatedSchedule);
-    setBannerNotice(autoBanner);
+    if (chosenDate) {
+      const parsedDate = new Date(chosenDate);
+      const formatted = parsedDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      const newHeader = `${serviceType} | ${formatted}`;
+      const autoBanner = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
+      updated.dateRange = newHeader;
+      setBannerNotice(autoBanner);
+      localStorage.setItem("church_banner", autoBanner);
+    }
 
-    localStorage.setItem("church_duty_schedule", JSON.stringify(updatedSchedule));
-    localStorage.setItem("church_banner", autoBanner);
+    setSchedule(updated);
+    localStorage.setItem("church_duty_schedule", JSON.stringify(updated));
   };
 
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("church_duty_schedule", JSON.stringify(schedule));
-    alert("Worship duty schedule, date header, and top banner saved!");
+    alert("Saved! Unselected services are now completely hidden on the public schedule page.");
   };
 
   const handleUpdateBanner = (e: React.FormEvent) => {
@@ -264,7 +311,6 @@ export default function AdminDashboard() {
     alert("Top alert banner updated!");
   };
 
-  // LOGIN SCREEN (PIN IS COMPLETELY HIDDEN)
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -324,7 +370,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="text-lg font-bold text-slate-900">Worship Duty Scheduler & Date Settings</h2>
               <p className="text-xs text-slate-500">
-                Pick a date below. It will automatically update the duty schedule header and homepage announcement banner.
+                Selecting a service automatically enables only its matching duties and hides all other days.
               </p>
             </div>
             <button
@@ -335,7 +381,6 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          {/* DATE PICKER & SERVICE PRESET */}
           <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-3">
             <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
               📅 Set Worship Service & Date
@@ -347,7 +392,7 @@ export default function AdminDashboard() {
                   value={selectedServiceType}
                   onChange={(e) => {
                     setSelectedServiceType(e.target.value);
-                    if (selectedDate) handleDatePick(selectedDate, e.target.value);
+                    applyPresetServices(e.target.value, selectedDate);
                   }}
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-700 outline-none"
                 >
@@ -364,7 +409,10 @@ export default function AdminDashboard() {
                 <input
                   type="date"
                   value={selectedDate}
-                  onChange={(e) => handleDatePick(e.target.value, selectedServiceType)}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    applyPresetServices(selectedServiceType, e.target.value);
+                  }}
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-700 outline-none cursor-pointer"
                 />
               </div>
@@ -376,7 +424,6 @@ export default function AdminDashboard() {
                   value={schedule.dateRange}
                   onChange={(e) => setSchedule({ ...schedule, dateRange: e.target.value })}
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-blue-950 focus:ring-2 focus:ring-blue-700 outline-none"
-                  placeholder="e.g. Midweek Worship | September 9, 2026"
                 />
               </div>
             </div>
@@ -392,13 +439,13 @@ export default function AdminDashboard() {
                 ["ay", "Adventist Youth Hour (Saturday Afternoon)"],
               ] as const
             ).map(([key, label]) => {
-              const isEnabled = schedule[key].enabled !== false;
+              const isEnabled = schedule[key]?.enabled === true;
               return (
                 <div
                   key={key}
                   className={`border rounded-xl p-4 transition-colors ${
                     key === "divineWorship" ? "md:col-span-2" : ""
-                  } ${isEnabled ? "bg-white border-blue-200 shadow-sm" : "bg-slate-100 border-slate-200 opacity-60"}`}
+                  } ${isEnabled ? "bg-white border-blue-400 shadow-sm" : "bg-slate-100 border-slate-200 opacity-50"}`}
                 >
                   <div className="flex items-center justify-between mb-3 border-b pb-2 border-slate-200">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -413,7 +460,7 @@ export default function AdminDashboard() {
                       </span>
                     </label>
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${isEnabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"}`}>
-                      {isEnabled ? "Visible on Website" : "Hidden"}
+                      {isEnabled ? "Visible on Public Page" : "Hidden"}
                     </span>
                   </div>
 
@@ -439,7 +486,7 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 2. TOP ALERT BANNER (SYNCED) */}
+        {/* 2. TOP ALERT BANNER */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-slate-800">Live Top Alert Announcement Banner</h2>
@@ -458,65 +505,52 @@ export default function AdminDashboard() {
           </form>
         </section>
 
-        {/* 3. REGISTERED MEMBERS DIRECTORY */}
+        {/* 3. MANAGE & DELETE EXISTING EVENTS / HIGHLIGHTS */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div>
-            <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
-            <p className="text-xs text-slate-500">Assign ministry roles or remove records.</p>
+            <h2 className="text-base font-bold text-slate-800">Manage Active Events & Highlights ({events.length})</h2>
+            <p className="text-xs text-slate-500">View or remove posted church events displayed on the homepage.</p>
           </div>
 
-          {members.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">No registered members yet.</p>
+          {events.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">No events currently posted.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead className="bg-slate-50 text-slate-900 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3">Full Name</th>
-                    <th className="p-3">Contact</th>
-                    <th className="p-3">Address</th>
-                    <th className="p-3">Ministry Role</th>
-                    <th className="p-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {members.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-50">
-                      <td className="p-3 font-semibold text-slate-900">{m.fullName}</td>
-                      <td className="p-3">{m.phone}</td>
-                      <td className="p-3">{m.address}</td>
-                      <td className="p-3">
-                        <select
-                          value={m.department || "Regular Church Member"}
-                          onChange={(e) => handleDepartmentChange(m.id, e.target.value)}
-                          className="bg-white border border-slate-300 text-slate-800 text-xs rounded-md px-2 py-1.5 focus:ring-2 focus:ring-blue-600 outline-none font-medium"
-                        >
-                          {DEPARTMENTS.map((dept) => (
-                            <option key={dept} value={dept}>
-                              {dept}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleDeleteMember(m.id)}
-                          className="text-rose-600 hover:underline font-medium"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((ev) => (
+                <div key={ev.id} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col justify-between shadow-xs">
+                  {ev.image ? (
+                    <div className="h-32 w-full overflow-hidden bg-slate-200">
+                      <img src={ev.image} alt={ev.title} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="h-24 bg-blue-50 flex items-center justify-center text-blue-400 text-xs font-semibold">
+                      No Photo Attached
+                    </div>
+                  )}
+                  <div className="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">{ev.date}</span>
+                      <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mt-0.5">{ev.title}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-2 mt-1">{ev.desc}</p>
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-slate-200 flex justify-end">
+                      <button
+                        onClick={() => handleDeleteEvent(ev.id)}
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <span>🗑️</span> Delete Event
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
 
-        {/* 4. POST EVENT WITH PHOTO */}
+        {/* 4. POST NEW EVENT WITH PHOTO */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-base font-bold text-slate-800">Post Event or Highlight (With Photo)</h2>
+          <h2 className="text-base font-bold text-slate-800">+ Add New Event or Highlight (With Photo)</h2>
           <form onSubmit={handleAddEvent} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Event Title *</label>
@@ -574,6 +608,62 @@ export default function AdminDashboard() {
               </button>
             </div>
           </form>
+        </section>
+
+        {/* 5. REGISTERED MEMBERS DIRECTORY */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
+            <p className="text-xs text-slate-500">Assign ministry roles or remove records.</p>
+          </div>
+
+          {members.length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No registered members yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-50 text-slate-900 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">Full Name</th>
+                    <th className="p-3">Contact</th>
+                    <th className="p-3">Address</th>
+                    <th className="p-3">Ministry Role</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {members.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-semibold text-slate-900">{m.fullName}</td>
+                      <td className="p-3">{m.phone}</td>
+                      <td className="p-3">{m.address}</td>
+                      <td className="p-3">
+                        <select
+                          value={m.department || "Regular Church Member"}
+                          onChange={(e) => handleDepartmentChange(m.id, e.target.value)}
+                          className="bg-white border border-slate-300 text-slate-800 text-xs rounded-md px-2 py-1.5 focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                        >
+                          {DEPARTMENTS.map((dept) => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleDeleteMember(m.id)}
+                          className="text-rose-600 hover:underline font-medium"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </main>
     </div>
