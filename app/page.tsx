@@ -30,10 +30,12 @@ function formatDriveUrl(url: string) {
   return url;
 }
 
-function getYouTubeEmbedUrl(url: string) {
+function getYouTubeEmbedUrl(url: string, autoplay = false) {
   if (!url) return null;
   const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-  if (ytMatch && ytMatch[1]) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}${autoplay ? "?autoplay=1" : ""}`;
+  }
   return null;
 }
 
@@ -41,10 +43,11 @@ export default function HomePage() {
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [nextService, setNextService] = useState<ScheduledServiceItem | null>(null);
   const [banner, setBanner] = useState("");
+  
+  // Expanded Modal State for viewing videos/photos in a large player without full screen
+  const [activeModalItem, setActiveModalItem] = useState<ChurchEvent | null>(null);
 
-  // Central sync function reading all updated admin data
   const syncWithAdminData = useCallback(() => {
-    // 1. Sync Events
     const savedEvents = localStorage.getItem("church_events");
     if (savedEvents) {
       try {
@@ -56,11 +59,9 @@ export default function HomePage() {
       setEvents([]);
     }
 
-    // 2. Sync Top Announcement Banner
     const savedBanner = localStorage.getItem("church_banner");
     setBanner(savedBanner || "");
 
-    // 3. Sync Nearest Worship Schedule
     const savedSchedules = localStorage.getItem("church_multi_schedules");
     if (savedSchedules) {
       try {
@@ -87,12 +88,8 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // Initial sync
     syncWithAdminData();
-
-    // Listen to local window updates (same tab navigation)
     window.addEventListener("church_data_updated", syncWithAdminData);
-    // Listen to cross-tab updates (separate browser tab)
     window.addEventListener("storage", syncWithAdminData);
 
     return () => {
@@ -101,7 +98,6 @@ export default function HomePage() {
     };
   }, [syncWithAdminData]);
 
-  // Format the duty preview summary for the centerpiece card
   const dutyPreviewText = nextService?.duties && nextService.duties.length > 0
     ? nextService.duties
         .filter((d) => d.assignedTo)
@@ -111,8 +107,8 @@ export default function HomePage() {
     : "Assignments: Superintendent, Preacher, Mission Story Reader, Lesson Teachers";
 
   return (
-    <div className="min-h-screen bg-[#f3f7fc] text-slate-800 font-sans antialiased flex flex-col">
-      {/* 1. TOP BANNER (SYNCED LIVE) */}
+    <div className="min-h-screen bg-[#f3f7fc] text-slate-800 font-sans antialiased flex flex-col relative selection:bg-blue-600 selection:text-white">
+      {/* 1. TOP BANNER */}
       {banner && (
         <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2 px-4 text-center shadow-xs">
           <span className="inline-flex items-center gap-2">
@@ -123,7 +119,7 @@ export default function HomePage() {
       )}
 
       {/* 2. TOP NAV BAR */}
-      <header className="bg-[#101828] text-white sticky top-0 z-50">
+      <header className="bg-[#101828] text-white sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-200 text-sm font-serif">
@@ -161,7 +157,7 @@ export default function HomePage() {
           </h1>
         </div>
 
-        {/* 4. CENTERPIECE CARD: DIRECTLY SYNCED TO ADMIN SCHEDULE */}
+        {/* 4. CENTERPIECE CARD */}
         <div className="max-w-3xl mx-auto mt-9 bg-[#111a2e] text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-slate-800 relative text-center">
           <div className="sm:absolute sm:top-5 sm:left-6 mb-3 sm:mb-0 inline-flex items-center gap-1.5 bg-[#1e2e4f] text-blue-300 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
             <span>🗓️</span> NEXT SERVICE
@@ -240,7 +236,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. EVENTS & HIGHLIGHTS GRID (SYNCED LIVE) */}
+      {/* 6. EVENTS & HIGHLIGHTS GRID (CLICK TO MAXIMIZE IN MODAL) */}
       <section id="highlights" className="max-w-4xl mx-auto w-full px-4 pt-6 pb-16">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[11px] font-bold tracking-wider uppercase text-slate-700">
@@ -258,41 +254,25 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
             {events.slice(0, 8).map((ev) => {
-              const ytEmbed = ev.videoUrl ? getYouTubeEmbedUrl(ev.videoUrl) : null;
               const photoUrl = ev.mediaUrl ? formatDriveUrl(ev.mediaUrl) : null;
+              const hasVideo = Boolean(ev.videoUrl);
 
               return (
                 <div
                   key={ev.id}
-                  className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col justify-between"
+                  onClick={() => setActiveModalItem(ev)}
+                  className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col justify-between cursor-pointer hover:border-blue-500 transition group"
                 >
-                  {ytEmbed ? (
-                    <div className="h-28 bg-black">
-                      <iframe
-                        src={ytEmbed}
-                        title={ev.title}
-                        className="w-full h-full border-0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : photoUrl ? (
-                    <div className="h-28 bg-slate-100 overflow-hidden">
-                      <img src={photoUrl} alt={ev.title} className="w-full h-full object-cover" />
-                    </div>
-                  ) : ev.videoUrl ? (
-                    <div className="h-28 bg-slate-900 text-white flex flex-col items-center justify-center p-2 relative">
-                      <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-xs">
+                  {hasVideo ? (
+                    <div className="h-28 bg-slate-900 text-white flex flex-col items-center justify-center p-2 relative group-hover:bg-slate-800 transition">
+                      <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-xs shadow-md group-hover:scale-110 transition">
                         ▶
                       </div>
-                      <a
-                        href={ev.videoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] text-blue-300 underline mt-1 truncate max-w-full px-2"
-                      >
-                        Watch Video &rarr;
-                      </a>
+                      <span className="text-[10px] text-slate-300 font-semibold mt-1">Click to Play</span>
+                    </div>
+                  ) : photoUrl ? (
+                    <div className="h-28 bg-slate-100 overflow-hidden relative">
+                      <img src={photoUrl} alt={ev.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
                     </div>
                   ) : (
                     <div className="h-28 bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-medium">
@@ -311,7 +291,68 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* 7. FOOTER */}
+      {/* 7. CINEMATIC MODAL POPUP (MAXIMIZES WHEN CLICKED, MINIMIZES WHEN CLOSED) */}
+      {activeModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">{activeModalItem.date}</span>
+                <h3 className="text-sm font-black truncate">{activeModalItem.title}</h3>
+              </div>
+              <button
+                onClick={() => setActiveModalItem(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold transition text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Media Body */}
+            <div className="bg-black flex items-center justify-center aspect-video w-full overflow-hidden relative">
+              {activeModalItem.videoUrl && getYouTubeEmbedUrl(activeModalItem.videoUrl, true) ? (
+                <iframe
+                  src={getYouTubeEmbedUrl(activeModalItem.videoUrl, true) || ""}
+                  title={activeModalItem.title}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : activeModalItem.mediaUrl ? (
+                <img
+                  src={formatDriveUrl(activeModalItem.mediaUrl)}
+                  alt={activeModalItem.title}
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                <div className="text-slate-400 text-xs">No media preview available</div>
+              )}
+            </div>
+
+            {/* Modal Description Footer */}
+            <div className="p-5 bg-white space-y-3 overflow-y-auto">
+              <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                {activeModalItem.desc}
+              </p>
+              {activeModalItem.videoUrl && !getYouTubeEmbedUrl(activeModalItem.videoUrl) && (
+                <div className="pt-2">
+                  <a
+                    href={activeModalItem.videoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    <span>🔗</span> Open external video link &rarr;
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. FOOTER */}
       <footer className="mt-auto bg-white border-t border-slate-200 py-6 px-4 text-center text-xs text-slate-500">
         <p>&copy; {new Date().getFullYear()} Tubod Seventh-day Adventist Church. All rights reserved.</p>
         <div className="mt-2 flex justify-center gap-4 text-[11px]">
