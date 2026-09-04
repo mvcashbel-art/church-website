@@ -19,7 +19,7 @@ interface AlertItem {
   time: string;
   date: string;
   badgeText: string;
-  isUrgent: boolean; // true only for Today / Tomorrow
+  isUrgent: boolean;
 }
 
 export default function ServiceAlertToast() {
@@ -36,7 +36,6 @@ export default function ServiceAlertToast() {
       try {
         const list: ScheduledServiceItem[] = JSON.parse(savedMulti);
         
-        // Filter active services
         const valid = list.filter((item) => {
           if (!item.date) return false;
           const endOfDay = new Date(item.date);
@@ -44,7 +43,6 @@ export default function ServiceAlertToast() {
           return now.getTime() <= endOfDay.getTime();
         });
 
-        // Sort ascending: nearest date first
         valid.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         valid.forEach((item) => {
@@ -69,7 +67,7 @@ export default function ServiceAlertToast() {
           } else {
             const days = Math.ceil(diffHours / 24);
             badge = `⏳ In ${days} Days`;
-            urgent = false; // Future dates stay sleek dark blue
+            urgent = false;
           }
 
           candidateList.push({
@@ -126,7 +124,6 @@ export default function ServiceAlertToast() {
             : "bg-[#111a2e] text-white border-slate-700 shadow-slate-950/50"
         }`}
       >
-        {/* HEADER CONTROLS */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
@@ -181,7 +178,6 @@ export default function ServiceAlertToast() {
           )}
         </div>
 
-        {/* SERVICE INFO */}
         <div>
           <h4 className="font-black text-sm leading-tight truncate">
             {current.serviceType}
@@ -195,7 +191,6 @@ export default function ServiceAlertToast() {
           </p>
         </div>
 
-        {/* FOOTER ACTIONS */}
         <div className="pt-2 flex items-center justify-between border-t border-black/10 mt-0.5">
           <Link
             href="/schedule"
