@@ -28,7 +28,7 @@ const DEFAULT_EVENTS: ChurchEvent[] = [
 
 export default function ChurchHome() {
   const [events, setEvents] = useState<ChurchEvent[]>(DEFAULT_EVENTS);
-  const [banner, setBanner] = useState("📢 Upcoming: Midweek Worship | September 9, 2026 - Please check the duty roster for your assignments!");
+  const [banner, setBanner] = useState("📢 Upcoming: Midweek Worship | September 9, 2026 - Please check the Worship Schedule for your assignments!");
 
   useEffect(() => {
     const savedEvents = localStorage.getItem("church_events");
@@ -73,7 +73,7 @@ export default function ChurchHome() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
             <a href="#services" className="hover:text-blue-600 transition-colors">Services</a>
             <Link href="/schedule" className="text-blue-600 hover:text-blue-700 transition-colors font-semibold flex items-center gap-1.5">
-              <span>📋</span> Duty Roster
+              <span>📋</span> Worship Schedule
             </Link>
             <a href="#events" className="hover:text-blue-600 transition-colors">Events & Photos</a>
             <a href="#community" className="hover:text-blue-600 transition-colors">Membership</a>
@@ -113,7 +113,7 @@ export default function ChurchHome() {
               href="/schedule"
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
             >
-              <span>📋</span> View Weekly Duty Roster
+              <span>📋</span> View Weekly Worship Schedule
             </Link>
             <a
               href="#services"
@@ -241,7 +241,7 @@ export default function ChurchHome() {
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Join the Church Fellowship Directory</h2>
           <p className="text-slate-600 text-sm max-w-lg mx-auto">
-            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service rosters and updates.
+            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service Schedules and updates.
           </p>
           <div className="pt-2">
             <Link
@@ -259,7 +259,7 @@ export default function ChurchHome() {
         <p>&copy; {new Date().getFullYear()} Tubod Seventh-day Adventist Church. All rights reserved.</p>
         <div className="mt-3 flex justify-center gap-4 text-[11px]">
           <Link href="/schedule" className="text-slate-600 hover:text-blue-600 transition-colors">
-            Duty Roster
+            Worship Schedule
           </Link>
           <span className="text-slate-300">•</span>
           <Link href="/register" className="text-slate-600 hover:text-blue-600 transition-colors">
