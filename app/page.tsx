@@ -8,11 +8,19 @@ interface ChurchEvent {
   title: string;
   date: string;
   desc: string;
-  mediaUrl?: string; // Google Drive image link or direct photo link
-  videoUrl?: string; // YouTube or Facebook video link
+  mediaUrl?: string;
+  videoUrl?: string;
 }
 
-// Convert Google Drive share links or YouTube links to direct embeds
+interface ScheduledServiceItem {
+  id: string;
+  serviceType: string;
+  title: string;
+  time: string;
+  date: string;
+  duties: { role: string; assignedTo: string }[];
+}
+
 function formatGoogleDriveUrl(url: string) {
   if (!url) return "";
   if (url.includes("drive.google.com")) {
@@ -35,26 +43,50 @@ function getYouTubeEmbedUrl(url: string) {
 
 export default function ChurchHome() {
   const [events, setEvents] = useState<ChurchEvent[]>([]);
+  const [nextService, setNextService] = useState<ScheduledServiceItem | null>(null);
   const [banner, setBanner] = useState("");
 
   useEffect(() => {
+    // 1. Fetch Events
     const savedEvents = localStorage.getItem("church_events");
     if (savedEvents !== null) {
       try {
         setEvents(JSON.parse(savedEvents));
       } catch (e) {}
     }
+
+    // 2. Fetch Active Banner
     const savedBanner = localStorage.getItem("church_banner");
     if (savedBanner) {
       setBanner(savedBanner);
     } else {
       setBanner("");
     }
+
+    // 3. Find Nearest Upcoming Worship Service
+    const savedMulti = localStorage.getItem("church_multi_schedules");
+    if (savedMulti) {
+      try {
+        const list: ScheduledServiceItem[] = JSON.parse(savedMulti);
+        const now = new Date();
+        const future = list.filter((item) => {
+          if (!item.date) return false;
+          const endOfDay = new Date(item.date);
+          endOfDay.setHours(23, 59, 59, 999);
+          return now.getTime() <= endOfDay.getTime();
+        });
+
+        future.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        if (future.length > 0) {
+          setNextService(future[0]);
+        }
+      } catch (e) {}
+    }
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-200 selection:text-blue-900">
-      {/* 1. ANNOUNCEMENT BANNER - ONLY SHOWS IF NOT EMPTY */}
+      {/* 1. TOP ANNOUNCEMENT BANNER */}
       {banner && (
         <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
           <span className="inline-flex items-center gap-2">
@@ -82,11 +114,8 @@ export default function ChurchHome() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-            <a href="#services" className="hover:text-blue-600 transition-colors">Services</a>
-            <Link href="/schedule" className="text-blue-600 hover:text-blue-700 transition-colors font-semibold flex items-center gap-1.5">
-              <span>📋</span> Worship Schedule
-            </Link>
-            <a href="#events" className="hover:text-blue-600 transition-colors">Events & Photos</a>
+            <a href="#services" className="hover:text-blue-600 transition-colors">Worship & Roster</a>
+            <a href="#events" className="hover:text-blue-600 transition-colors">Events & Highlights</a>
             <a href="#community" className="hover:text-blue-600 transition-colors">Membership</a>
           </nav>
 
@@ -95,14 +124,14 @@ export default function ChurchHome() {
               href="/register"
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-xs hover:shadow-md hover:shadow-blue-600/20 active:scale-95"
             >
-              Member Portal
+              Member Registration
             </Link>
           </div>
         </div>
       </header>
 
       {/* 3. HERO */}
-      <section className="relative overflow-hidden pt-16 pb-24 px-4 text-center bg-gradient-to-b from-blue-100/60 via-blue-50/40 to-slate-50">
+      <section className="relative overflow-hidden pt-16 pb-20 px-4 text-center bg-gradient-to-b from-blue-100/60 via-blue-50/40 to-slate-50">
         <div className="max-w-4xl mx-auto space-y-6 relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-blue-200 bg-white text-blue-700 text-xs font-semibold shadow-xs">
             <span>✨</span> Welcome to Our Sanctuary & Online Fellowship
@@ -119,7 +148,7 @@ export default function ChurchHome() {
             A Bible-believing family committed to Sabbath worship, Gospel truth, Christian fellowship, and loving service across Tubod.
           </p>
 
-          <div className="flex flex-wrap justify-center gap-3 pt-3">
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
             <Link
               href="/schedule"
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-md shadow-blue-600/20 flex items-center gap-2"
@@ -136,8 +165,32 @@ export default function ChurchHome() {
         </div>
       </section>
 
-      {/* 4. SERVICE HOURS & LOCATION */}
-      <section id="services" className="py-8 px-4 max-w-6xl mx-auto w-full -mt-10 relative z-20">
+      {/* 4. WORSHIP SCHEDULE & MEETING HOURS (PRIMARY POSITION) */}
+      <section id="services" className="py-8 px-4 max-w-6xl mx-auto w-full -mt-6 relative z-20 space-y-6">
+        {/* NEAREST LIVE SERVICE CARD */}
+        {nextService && (
+          <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-blue-800">
+            <div className="space-y-2">
+              <span className="inline-block bg-amber-400 text-amber-950 font-black text-[10px] uppercase px-2.5 py-1 rounded-full tracking-wider">
+                ⚡ Next Upcoming Worship
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black">{nextService.serviceType}</h2>
+              <p className="text-xs sm:text-sm text-blue-200">
+                {new Date(nextService.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })} • {nextService.time}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/schedule"
+                className="bg-white text-blue-900 hover:bg-blue-50 font-bold px-5 py-2.5 rounded-xl text-xs transition-all shadow-md flex items-center gap-2"
+              >
+                <span>📋</span> View Duty Assignments &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* REGULAR SERVICE HOURS & SANCTUARY LOCATION */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-white border border-slate-200/80 p-7 rounded-2xl shadow-xs">
             <div className="flex items-center gap-3 mb-5">
@@ -184,16 +237,19 @@ export default function ChurchHome() {
                 Tubod Seventh-day Adventist Church Sanctuary, Tubod, Leyte, Philippines. All guests, visitors, and members are warmly welcome.
               </p>
             </div>
-            <div className="pt-5 border-t border-slate-100">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer transition-colors">
+            <div className="pt-5 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer transition-colors">
                 Open Directions in Google Maps &rarr;
               </span>
+              <Link href="/schedule" className="text-xs font-bold text-slate-600 hover:text-blue-600">
+                Full Duty Roster &rarr;
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5. EVENTS & PHOTO/VIDEO HIGHLIGHTS */}
+      {/* 5. EVENTS & PHOTO/VIDEO HIGHLIGHTS (FOLLOWS THE SERVICES) */}
       <section id="events" className="py-12 px-4 max-w-6xl mx-auto w-full">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-3 border-b border-slate-200/80 pb-4">
           <div>
@@ -207,7 +263,7 @@ export default function ChurchHome() {
 
         {events.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-500 text-xs">
-            No highlights or events posted right now.
+            No highlights or events posted right now. New photos will appear here when added in the Admin Portal.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -220,7 +276,6 @@ export default function ChurchHome() {
                   key={ev.id}
                   className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
                 >
-                  {/* VIDEO EMBED OR DRIVE PHOTO */}
                   {ytEmbed ? (
                     <div className="relative aspect-video w-full bg-black">
                       <iframe
@@ -287,7 +342,7 @@ export default function ChurchHome() {
         )}
       </section>
 
-      {/* 6. MEMBER REGISTRATION */}
+      {/* 6. MEMBER REGISTRATION BANNER */}
       <section id="community" className="py-14 px-4 bg-white border-y border-slate-200/80 my-8">
         <div className="max-w-3xl mx-auto text-center space-y-4">
           <span className="inline-block p-3 rounded-2xl bg-blue-50 text-blue-600 text-2xl">
@@ -295,7 +350,7 @@ export default function ChurchHome() {
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Join the Church Fellowship Directory</h2>
           <p className="text-slate-600 text-sm max-w-lg mx-auto">
-            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service rosters and updates.
+            Are you regularly attending or part of the Tubod congregation? Keep connected with weekly service rosters and announcements.
           </p>
           <div className="pt-2">
             <Link
