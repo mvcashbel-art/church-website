@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-interface ScheduledServiceItem {
+export interface ScheduledServiceItem {
   id: string;
   serviceType: string;
   title: string;
@@ -63,6 +63,20 @@ const SERVICE_TEMPLATES: Record<string, { title: string; defaultTime: string; ro
   },
 };
 
+const DEPARTMENTS = [
+  "Regular Church Member",
+  "Visitor / Guest",
+  "Youth (AY / Adventist Youth)",
+  "Sabbath School",
+  "Personal Ministries",
+  "Deacon / Deaconess",
+  "Adventurers / Pathfinders",
+  "Music & Choir",
+  "Health Ministries",
+  "Communications & Media",
+  "Church Elder / Board"
+];
+
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState("");
@@ -71,13 +85,21 @@ export default function AdminDashboard() {
   const [schedules, setSchedules] = useState<ScheduledServiceItem[]>([]);
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [bannerNotice, setBannerNotice] = useState("");
 
-  // Form State for creating a new service
+  // Schedule form state
   const [chosenType, setChosenType] = useState("Midweek Prayer Meeting");
   const [serviceDate, setServiceDate] = useState("");
   const [serviceDuties, setServiceDuties] = useState<{ role: string; assignedTo: string }[]>(
     SERVICE_TEMPLATES["Midweek Prayer Meeting"].roles.map((r) => ({ role: r, assignedTo: "" }))
   );
+
+  // Event form state
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventDesc, setEventDesc] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
 
   useEffect(() => {
     const savedSchedules = localStorage.getItem("church_multi_schedules");
@@ -88,7 +110,7 @@ export default function AdminDashboard() {
     }
 
     const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents) {
+    if (savedEvents !== null) {
       try {
         setEvents(JSON.parse(savedEvents));
       } catch (e) {}
@@ -100,6 +122,9 @@ export default function AdminDashboard() {
         setMembers(JSON.parse(savedMembers));
       } catch (e) {}
     }
+
+    const savedBanner = localStorage.getItem("church_banner");
+    if (savedBanner) setBannerNotice(savedBanner);
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -112,6 +137,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // Schedule Handlers
   const handleTypeChange = (newType: string) => {
     setChosenType(newType);
     setServiceDuties(
@@ -137,16 +163,15 @@ export default function AdminDashboard() {
     };
 
     const updated = [...schedules, newService];
-    // Sort so nearest is immediately recognized
     updated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     setSchedules(updated);
     localStorage.setItem("church_multi_schedules", JSON.stringify(updated));
 
-    // Update banner with nearest
     const top = updated[0];
     const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - Duty roster active!`;
     localStorage.setItem("church_banner", autoBanner);
+    setBannerNotice(autoBanner);
 
     alert(`${chosenType} schedule published!`);
     setServiceDate("");
@@ -161,9 +186,67 @@ export default function AdminDashboard() {
       const top = updated[0];
       const autoBanner = `📢 Upcoming: ${top.serviceType} | ${new Date(top.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
       localStorage.setItem("church_banner", autoBanner);
+      setBannerNotice(autoBanner);
     } else {
       localStorage.removeItem("church_banner");
+      setBannerNotice("");
     }
+  };
+
+  // Event Handlers
+  const handleAddEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventTitle || !eventDesc) return;
+
+    const newEvent: ChurchEvent = {
+      id: Date.now(),
+      title: eventTitle,
+      date: eventDate || "Upcoming",
+      desc: eventDesc,
+      mediaUrl: mediaUrl.trim(),
+      videoUrl: videoUrl.trim(),
+    };
+
+    const updated = [newEvent, ...events];
+    setEvents(updated);
+    localStorage.setItem("church_events", JSON.stringify(updated));
+
+    setEventTitle("");
+    setEventDate("");
+    setEventDesc("");
+    setMediaUrl("");
+    setVideoUrl("");
+    alert("Event published successfully!");
+  };
+
+  const handleDeleteEvent = (id: number) => {
+    const updated = events.filter((item) => item.id !== id);
+    setEvents(updated);
+    localStorage.setItem("church_events", JSON.stringify(updated));
+  };
+
+  // Member Handlers
+  const handleDepartmentChange = (memberId: number, newDept: string) => {
+    const updated = members.map((m) =>
+      m.id === memberId ? { ...m, department: newDept } : m
+    );
+    setMembers(updated);
+    localStorage.setItem("church_members", JSON.stringify(updated));
+  };
+
+  const handleDeleteMember = (id: number) => {
+    if (confirm("Remove this member from directory?")) {
+      const updated = members.filter((m) => m.id !== id);
+      setMembers(updated);
+      localStorage.setItem("church_members", JSON.stringify(updated));
+    }
+  };
+
+  // Banner Handler
+  const handleUpdateBanner = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem("church_banner", bannerNotice);
+    alert("Banner updated!");
   };
 
   if (!isAuthenticated) {
@@ -219,12 +302,12 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* 1. LIST OF SCHEDULED SERVICES */}
+        {/* 1. SCHEDULED SERVICES QUEUE */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="border-b pb-3 border-slate-100">
             <h2 className="text-base font-bold text-slate-800">Active Scheduled Services ({schedules.length})</h2>
             <p className="text-xs text-slate-500">
-              Arranged by nearest date. Once a service date passes, it is automatically removed from the public website.
+              Sorted chronologically by nearest date. Passed services auto-expire at midnight.
             </p>
           </div>
 
@@ -238,7 +321,7 @@ export default function AdminDashboard() {
                 <div key={s.id} className="p-4 border border-slate-200 rounded-xl flex items-center justify-between bg-slate-50">
                   <div>
                     <span className="text-[10px] font-bold text-blue-700 uppercase bg-blue-100 px-2 py-0.5 rounded">
-                      {idx === 0 ? "⚡ Nearest Upcoming" : "Queued"}
+                      {idx === 0 ? "⚡ Nearest Upcoming (On Top)" : "Queued"}
                     </span>
                     <h4 className="text-sm font-bold text-slate-900 mt-1">{s.serviceType}</h4>
                     <p className="text-xs text-slate-500">{s.date} • {s.time}</p>
@@ -255,12 +338,12 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* 2. SCHEDULE A NEW SERVICE (MIDWEEK, SABBATH, ETC.) */}
+        {/* 2. SCHEDULE AN INDIVIDUAL SERVICE FORM */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="border-b pb-3 border-slate-100">
             <h2 className="text-base font-bold text-slate-800">+ Schedule an Individual Service</h2>
             <p className="text-xs text-slate-500">
-              Create a service with its own date. It won't overwrite your other services.
+              Create a distinct service with its own calendar date. It will not overwrite your other services.
             </p>
           </div>
 
@@ -324,6 +407,198 @@ export default function AdminDashboard() {
               </button>
             </div>
           </form>
+        </section>
+
+        {/* 3. MANAGE & DELETE EXISTING EVENTS / HIGHLIGHTS */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div className="border-b pb-3 border-slate-100">
+            <h2 className="text-base font-bold text-slate-800">Manage Active Events & Highlights ({events.length})</h2>
+            <p className="text-xs text-slate-500">Events currently showing in the public "Events & Highlights" section.</p>
+          </div>
+
+          {events.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+              <p className="text-xs text-slate-500 font-medium">All events have been deleted. Nothing is displayed on the homepage.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((ev) => (
+                <div key={ev.id} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col justify-between shadow-xs">
+                  <div className="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">{ev.date}</span>
+                      <h4 className="text-sm font-bold text-slate-900 line-clamp-1 mt-0.5">{ev.title}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-2 mt-1">{ev.desc}</p>
+                      {ev.mediaUrl && <p className="text-[10px] text-slate-400 truncate mt-1">📷 {ev.mediaUrl}</p>}
+                      {ev.videoUrl && <p className="text-[10px] text-blue-600 truncate mt-0.5">🎥 {ev.videoUrl}</p>}
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-slate-200 flex justify-end">
+                      <button
+                        onClick={() => handleDeleteEvent(ev.id)}
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <span>🗑️</span> Delete Event
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* 4. POST EVENT WITH GOOGLE DRIVE PHOTO / YOUTUBE VIDEO */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">+ Add Event / Video Highlight</h2>
+            <p className="text-xs text-slate-500">
+              Paste a Google Drive image link or a YouTube/Facebook video link. Saves hosting space.
+            </p>
+          </div>
+
+          <form onSubmit={handleAddEvent} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Event Title *</label>
+              <input
+                type="text"
+                required
+                placeholder="Adventist Youth Fellowship & Music"
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Date & Time</label>
+              <input
+                type="text"
+                placeholder="Saturday - 3:30 PM"
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Google Drive Photo Link <span className="font-normal text-slate-400">("Anyone with link" view)</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                YouTube or Facebook Video Link
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=... or https://fb.watch/..."
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Details & Description *</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Describe the sermon, praise ministry, or gathering..."
+                value={eventDesc}
+                onChange={(e) => setEventDesc(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
+              />
+            </div>
+
+            <div>
+              <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2 rounded-lg text-xs shadow">
+                + Publish Highlight
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {/* 5. TOP ALERT BANNER */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-base font-bold text-slate-800">Live Top Alert Announcement Banner</h2>
+            <span className="text-xs text-slate-400">Shows across every page</span>
+          </div>
+          <form onSubmit={handleUpdateBanner} className="flex gap-3">
+            <input
+              type="text"
+              value={bannerNotice}
+              onChange={(e) => setBannerNotice(e.target.value)}
+              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-700 outline-none"
+            />
+            <button type="submit" className="bg-blue-800 hover:bg-blue-900 text-white text-xs font-semibold px-4 py-2 rounded-lg">
+              Save Banner
+            </button>
+          </form>
+        </section>
+
+        {/* 6. REGISTERED MEMBERS DIRECTORY */}
+        <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
+            <p className="text-xs text-slate-500">Assign ministry roles or remove records.</p>
+          </div>
+
+          {members.length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No registered members yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-50 text-slate-900 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">Full Name</th>
+                    <th className="p-3">Contact</th>
+                    <th className="p-3">Address</th>
+                    <th className="p-3">Ministry Role</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {members.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-semibold text-slate-900">{m.fullName}</td>
+                      <td className="p-3">{m.phone}</td>
+                      <td className="p-3">{m.address}</td>
+                      <td className="p-3">
+                        <select
+                          value={m.department || "Regular Church Member"}
+                          onChange={(e) => handleDepartmentChange(m.id, e.target.value)}
+                          className="bg-white border border-slate-300 text-slate-800 text-xs rounded-md px-2 py-1.5 focus:ring-2 focus:ring-blue-600 outline-none font-medium"
+                        >
+                          {DEPARTMENTS.map((dept) => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleDeleteMember(m.id)}
+                          className="text-rose-600 hover:underline font-medium"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </main>
     </div>
