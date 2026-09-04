@@ -4,52 +4,66 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface ScheduledServiceItem {
-  id: string;
-  serviceType: string;
-  title: string;
-  time: string;
-  date: string;
-  duties: { role: string; assignedTo: string }[];
-}
-
 export default function ServiceAlertToast() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
-  const [nearest, setNearest] = useState<ScheduledServiceItem | null>(null);
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [badgeText, setBadgeText] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
-    const raw = localStorage.getItem("church_multi_schedules");
-    if (!raw) {
+    let targetDateStr = "";
+    let serviceName = "";
+    let serviceTime = "";
+
+    // Check new multi-schedule format first
+    const savedMulti = localStorage.getItem("church_multi_schedules");
+    if (savedMulti) {
+      try {
+        const list = JSON.parse(savedMulti);
+        if (list.length > 0) {
+          list.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          const next = list[0];
+          targetDateStr = next.date;
+          serviceName = next.serviceType;
+          serviceTime = next.time;
+        }
+      } catch (e) {}
+    }
+
+    // Fallback to legacy format
+    if (!serviceName) {
+      const savedLegacy = localStorage.getItem("church_duty_schedule");
+      if (savedLegacy) {
+        try {
+          const leg = JSON.parse(savedLegacy);
+          if (leg.dateRange) {
+            serviceName = leg.dateRange;
+            targetDateStr = leg.dateRange.includes("|") ? leg.dateRange.split("|")[1].trim() : leg.dateRange;
+            serviceTime = "Active Schedule";
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!serviceName) {
       setVisible(false);
       return;
     }
 
-    try {
-      const list: ScheduledServiceItem[] = JSON.parse(raw);
-      const now = new Date();
+    const now = new Date();
+    const target = new Date(targetDateStr);
 
-      // Filter active (today or future)
-      const valid = list.filter((item) => {
-        if (!item.date) return false;
-        const endOfDay = new Date(item.date);
-        endOfDay.setHours(23, 59, 59, 999);
-        return now.getTime() <= endOfDay.getTime();
-      });
+    if (!isNaN(target.getTime())) {
+      const endOfDay = new Date(target);
+      endOfDay.setHours(23, 59, 59, 999);
 
-      if (valid.length === 0) {
+      if (now.getTime() > endOfDay.getTime()) {
         setVisible(false);
         return;
       }
 
-      // Sort by closest date
-      valid.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const nextUp = valid[0];
-      setNearest(nextUp);
-
-      const target = new Date(nextUp.date);
       const isSameDay =
         now.getFullYear() === target.getFullYear() &&
         now.getMonth() === target.getMonth() &&
@@ -70,25 +84,19 @@ export default function ServiceAlertToast() {
         setBadgeText("🗓️ Next Service");
         setIsUrgent(false);
       }
-
-      setVisible(true);
-    } catch (e) {
-      setVisible(false);
+    } else {
+      setBadgeText("🗓️ Upcoming Service");
     }
+
+    setTitle(serviceName);
+    setSubtitle(serviceTime);
+    setVisible(true);
   }, [pathname]);
 
-  if (!visible || !nearest || pathname === "/schedule" || pathname === "/admin") return null;
-
-  const formattedDate = new Date(nearest.date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  if (!visible || pathname === "/schedule" || pathname === "/admin") return null;
 
   return (
-    <aside
-      aria-label="Upcoming worship service reminder"
-      className="fixed bottom-5 right-5 z-50 max-w-sm w-[90vw] sm:w-80 transition-all duration-300"
-    >
+    <aside className="fixed bottom-5 right-5 z-50 max-w-sm w-[90vw] sm:w-80 transition-all">
       <div
         className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex flex-col gap-2 ${
           isUrgent
@@ -113,21 +121,17 @@ export default function ServiceAlertToast() {
         </div>
 
         <div>
-          <h4 className="font-bold text-sm leading-tight line-clamp-1 mt-1">
-            {nearest.serviceType} • {formattedDate}
-          </h4>
-          <p className={`text-xs mt-0.5 leading-relaxed ${isUrgent ? "text-slate-950 font-medium" : "text-slate-300"}`}>
-            {nearest.title} ({nearest.time})
+          <h4 className="font-bold text-sm leading-tight line-clamp-1 mt-1">{title}</h4>
+          <p className={`text-xs mt-0.5 ${isUrgent ? "text-slate-950 font-medium" : "text-slate-300"}`}>
+            {subtitle} • Please review duty assignments.
           </p>
         </div>
 
         <div className="pt-2 flex items-center justify-between border-t border-black/10 mt-1">
           <Link
             href="/schedule"
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 ${
-              isUrgent
-                ? "bg-slate-950 text-white hover:bg-slate-800"
-                : "bg-blue-600 text-white hover:bg-blue-500"
+            className={`text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-colors ${
+              isUrgent ? "bg-slate-950 text-white hover:bg-slate-800" : "bg-blue-600 text-white hover:bg-blue-500"
             }`}
           >
             View Duty Roster &rarr;
