@@ -41,19 +41,29 @@ const SERVICE_TEMPLATES: Record<string, { title: string; defaultTime: string; ro
     defaultTime: "Friday - 6:30 PM",
     roles: ["Song Leader", "Devotional Message", "Opening / Closing Prayer"],
   },
-  "Sabbath Worship Day": {
-    title: "Sabbath School & Divine Worship",
-    defaultTime: "Saturday - 8:30 AM to 12:00 PM",
+  "Sabbath School": {
+    title: "Sabbath Morning Bible Study & Lesson",
+    defaultTime: "Saturday - 8:30 AM",
     roles: [
-      "SS Superintendent",
-      "SS Song Leader",
+      "Superintendent",
+      "Song Leader / Chorister",
+      "Pianist / Organist",
       "Mission Story Reader",
-      "Lesson Teacher",
+      "Opening Prayer",
+      "Lesson Study Teacher",
+    ],
+  },
+  "Divine Worship Service": {
+    title: "Main Sabbath Divine Worship Service",
+    defaultTime: "Saturday - 10:30 AM",
+    roles: [
       "Platform Elder",
-      "Divine Preacher",
+      "Preacher / Speaker",
       "Scripture Reading",
-      "Pastoral Prayer",
+      "Pastoral / Intercessory Prayer",
+      "Tithe & Offertory Leader",
       "Head Deacon",
+      "Head Deaconess",
     ],
   },
   "Adventist Youth (AY) Program": {
@@ -74,7 +84,7 @@ const DEPARTMENTS = [
   "Music & Choir",
   "Health Ministries",
   "Communications & Media",
-  "Church Elder / Board"
+  "Church Elder / Board",
 ];
 
 export default function AdminDashboard() {
@@ -137,7 +147,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Schedule Handlers
   const handleTypeChange = (newType: string) => {
     setChosenType(newType);
     setServiceDuties(
@@ -193,7 +202,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Event Handlers
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventTitle || !eventDesc) return;
@@ -225,7 +233,6 @@ export default function AdminDashboard() {
     localStorage.setItem("church_events", JSON.stringify(updated));
   };
 
-  // Member Handlers
   const handleDepartmentChange = (memberId: number, newDept: string) => {
     const updated = members.map((m) =>
       m.id === memberId ? { ...m, department: newDept } : m
@@ -242,7 +249,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Banner Handler
   const handleUpdateBanner = (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem("church_banner", bannerNotice);
@@ -313,7 +319,7 @@ export default function AdminDashboard() {
 
           {schedules.length === 0 ? (
             <div className="p-6 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-500">
-              No services currently active. Schedule a Midweek or Sabbath service below.
+              No services currently active. Schedule a service below.
             </div>
           ) : (
             <div className="space-y-3">
@@ -343,7 +349,7 @@ export default function AdminDashboard() {
           <div className="border-b pb-3 border-slate-100">
             <h2 className="text-base font-bold text-slate-800">+ Schedule an Individual Service</h2>
             <p className="text-xs text-slate-500">
-              Create a distinct service with its own calendar date. It will not overwrite your other services.
+              Create a distinct service with its own calendar date. Select Sabbath School or Divine Worship independently.
             </p>
           </div>
 
@@ -381,7 +387,7 @@ export default function AdminDashboard() {
               <div className="grid sm:grid-cols-2 gap-2">
                 {serviceDuties.map((d, index) => (
                   <div key={index} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                    <span className="w-36 font-semibold text-slate-600 truncate">{d.role}</span>
+                    <span className="w-44 font-semibold text-slate-600 truncate">{d.role}</span>
                     <input
                       type="text"
                       placeholder="Assign name..."
