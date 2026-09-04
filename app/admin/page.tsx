@@ -20,7 +20,7 @@ interface Member {
   department?: string;
 }
 
-interface ServiceWorship {
+interface ServiceDuty {
   role: string;
   assignedTo: string;
 }
@@ -29,7 +29,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceWorship[];
+  duties: ServiceDuty[];
 }
 
 interface WeekSchedule {
@@ -48,7 +48,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
     time: "Wednesday - 6:30 PM",
     enabled: true,
     duties: [
-      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder " },
+      { role: "Leader / Moderator", assignedTo: "Worship Leader / Elder" },
       { role: "Devotional Speaker", assignedTo: "Assigned Speaker" },
       { role: "Intercessory Prayer", assignedTo: "Prayer Ministry" },
     ],
@@ -56,7 +56,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   vespers: {
     title: "Friday Vesper Worship",
     time: "Friday - 6:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Song Leader", assignedTo: "Music Ministry" },
       { role: "Devotional Message", assignedTo: "Assigned Speaker" },
@@ -66,7 +66,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   sabbathSchool: {
     title: "Sabbath School",
     time: "Saturday - 8:30 AM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Superintendent", assignedTo: "SS Superintendent" },
       { role: "Song Leader / Chorister", assignedTo: "Music Ministry" },
@@ -77,7 +77,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   divineWorship: {
     title: "Divine Worship Service",
     time: "Saturday - 10:30 AM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Platform Elder", assignedTo: "First Elder" },
       { role: "Preacher / Speaker", assignedTo: "Church Pastor / Elder" },
@@ -89,7 +89,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   ay: {
     title: "Adventist Youth (AY) Service",
     time: "Saturday - 3:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "AY Program Leader", assignedTo: "AY Sponsor" },
       { role: "Song Service", assignedTo: "AY Praise Team" },
@@ -123,7 +123,6 @@ export default function AdminDashboard() {
   const [bannerNotice, setBannerNotice] = useState("");
   const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
 
-  // Dedicated date picker state
   const [selectedServiceType, setSelectedServiceType] = useState("Midweek Worship");
   const [selectedDate, setSelectedDate] = useState("");
 
@@ -142,12 +141,11 @@ export default function AdminDashboard() {
     const savedBanner = localStorage.getItem("church_banner");
     if (savedBanner) setBannerNotice(savedBanner);
 
-    const savedSchedule = localStorage.getItem("church_worship_schedule");
+    const savedSchedule = localStorage.getItem("church_duty_schedule");
     if (savedSchedule) {
       try {
         const parsed = JSON.parse(savedSchedule);
-        const normalized = { ...DEFAULT_SCHEDULE, ...parsed };
-        setSchedule(normalized);
+        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
       } catch (e) {}
     }
   }, []);
@@ -158,7 +156,7 @@ export default function AdminDashboard() {
       setIsAuthenticated(true);
       setError("");
     } else {
-      setError("Invalid PIN. Default is 7777.");
+      setError("Incorrect security PIN. Access denied.");
     }
   };
 
@@ -221,43 +219,65 @@ export default function AdminDashboard() {
     setSchedule(updated);
   };
 
-  const handleUpdateWorship = (
+  const handleUpdateDuty = (
     serviceKey: keyof Omit<WeekSchedule, "dateRange">,
-    WorshipIndex: number,
+    dutyIndex: number,
     val: string
   ) => {
     const updated = { ...schedule };
-    updated[serviceKey].duties[WorshipIndex].assignedTo = val;
+    updated[serviceKey].duties[dutyIndex].assignedTo = val;
     setSchedule(updated);
   };
 
-  // When calendar date changes, construct the header and automatically update the alert banner
-  const handleDatePick = (chosenDate: string, servicePrefix: string) => {
-    setSelectedDate(chosenDate);
-    if (!chosenDate) return;
+  const applyPresetServices = (serviceType: string, chosenDate: string) => {
+    const updated: WeekSchedule = { ...schedule };
 
-    const parsedDate = new Date(chosenDate);
-    const formatted = parsedDate.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+    updated.midweek.enabled = false;
+    updated.vespers.enabled = false;
+    updated.sabbathSchool.enabled = false;
+    updated.divineWorship.enabled = false;
+    updated.ay.enabled = false;
 
-    const newHeader = `${servicePrefix} | ${formatted}`;
-    const autoBanner = `📢 Upcoming: ${newHeader} - Please check the Worship roster for your assignments!`;
+    if (serviceType === "Midweek Worship") {
+      updated.midweek.enabled = true;
+    } else if (serviceType === "Friday Vespers") {
+      updated.vespers.enabled = true;
+    } else if (serviceType === "Sabbath Worship Day") {
+      updated.sabbathSchool.enabled = true;
+      updated.divineWorship.enabled = true;
+      updated.ay.enabled = true;
+    } else if (serviceType === "AY Ministry Program") {
+      updated.ay.enabled = true;
+    } else {
+      updated.midweek.enabled = true;
+      updated.vespers.enabled = true;
+      updated.sabbathSchool.enabled = true;
+      updated.divineWorship.enabled = true;
+      updated.ay.enabled = true;
+    }
 
-    const updatedSchedule = { ...schedule, dateRange: newHeader };
-    setSchedule(updatedSchedule);
-    setBannerNotice(autoBanner);
+    if (chosenDate) {
+      const parsedDate = new Date(chosenDate);
+      const formatted = parsedDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+      const newHeader = `${serviceType} | ${formatted}`;
+      const autoBanner = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
+      updated.dateRange = newHeader;
+      setBannerNotice(autoBanner);
+      localStorage.setItem("church_banner", autoBanner);
+    }
 
-    localStorage.setItem("church_Worship_schedule", JSON.stringify(updatedSchedule));
-    localStorage.setItem("church_banner", autoBanner);
+    setSchedule(updated);
+    localStorage.setItem("church_duty_schedule", JSON.stringify(updated));
   };
 
   const handleSaveSchedule = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("church_Worship_schedule", JSON.stringify(schedule));
-    alert("Worship schedule, date header, and top banner saved!");
+    localStorage.setItem("church_duty_schedule", JSON.stringify(schedule));
+    alert("Saved! Unselected services are now completely hidden on the public schedule page.");
   };
 
   const handleUpdateBanner = (e: React.FormEvent) => {
@@ -273,15 +293,17 @@ export default function AdminDashboard() {
           <div className="text-center">
             <span className="text-3xl">🔐</span>
             <h1 className="text-xl font-bold text-slate-900 mt-2">Tubod SDA Admin Portal</h1>
-            <p className="text-xs text-slate-500">Enter your church admin PIN to manage website</p>
+            <p className="text-xs text-slate-500">Authorized personnel only</p>
           </div>
           {error && <p className="text-xs text-red-600 bg-red-50 p-2 rounded text-center">{error}</p>}
           <input
             type="password"
-            placeholder="Enter PIN (Default: 7777)"
+            inputMode="numeric"
+            autoComplete="current-password"
+            placeholder="••••"
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg p-2.5 text-center tracking-widest text-lg font-mono focus:ring-2 focus:ring-blue-700 outline-none"
+            className="w-full border border-slate-300 rounded-lg p-2.5 text-center tracking-[0.5em] text-2xl font-mono focus:ring-2 focus:ring-blue-700 outline-none"
           />
           <button type="submit" className="w-full bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2.5 rounded-lg text-sm">
             Unlock Admin Panel
@@ -317,13 +339,12 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* 1. PARTICIPANT Worship SCHEDULER */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Worship Scheduler & Date Settings</h2>
+              <h2 className="text-lg font-bold text-slate-900">Worship Duty Scheduler & Date Settings</h2>
               <p className="text-xs text-slate-500">
-                Pick a date below. It will automatically update the Worship schedule header and homepage announcement banner.
+                Selecting a service automatically enables only its matching duties and hides all other days.
               </p>
             </div>
             <button
@@ -334,7 +355,6 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          {/* DATE PICKER & SERVICE PRESET */}
           <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-3">
             <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
               📅 Set Worship Service & Date
@@ -346,7 +366,7 @@ export default function AdminDashboard() {
                   value={selectedServiceType}
                   onChange={(e) => {
                     setSelectedServiceType(e.target.value);
-                    if (selectedDate) handleDatePick(selectedDate, e.target.value);
+                    applyPresetServices(e.target.value, selectedDate);
                   }}
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-700 outline-none"
                 >
@@ -363,7 +383,10 @@ export default function AdminDashboard() {
                 <input
                   type="date"
                   value={selectedDate}
-                  onChange={(e) => handleDatePick(e.target.value, selectedServiceType)}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    applyPresetServices(selectedServiceType, e.target.value);
+                  }}
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-2 focus:ring-blue-700 outline-none cursor-pointer"
                 />
               </div>
@@ -375,7 +398,6 @@ export default function AdminDashboard() {
                   value={schedule.dateRange}
                   onChange={(e) => setSchedule({ ...schedule, dateRange: e.target.value })}
                   className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-blue-950 focus:ring-2 focus:ring-blue-700 outline-none"
-                  placeholder="e.g. Midweek Worship | September 9, 2026"
                 />
               </div>
             </div>
@@ -391,13 +413,13 @@ export default function AdminDashboard() {
                 ["ay", "Adventist Youth Hour (Saturday Afternoon)"],
               ] as const
             ).map(([key, label]) => {
-              const isEnabled = schedule[key].enabled !== false;
+              const isEnabled = schedule[key]?.enabled === true;
               return (
                 <div
                   key={key}
                   className={`border rounded-xl p-4 transition-colors ${
                     key === "divineWorship" ? "md:col-span-2" : ""
-                  } ${isEnabled ? "bg-white border-blue-200 shadow-sm" : "bg-slate-100 border-slate-200 opacity-60"}`}
+                  } ${isEnabled ? "bg-white border-blue-400 shadow-sm" : "bg-slate-100 border-slate-200 opacity-50"}`}
                 >
                   <div className="flex items-center justify-between mb-3 border-b pb-2 border-slate-200">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -412,19 +434,19 @@ export default function AdminDashboard() {
                       </span>
                     </label>
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${isEnabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"}`}>
-                      {isEnabled ? "Visible on Website" : "Hidden"}
+                      {isEnabled ? "Visible on Public Page" : "Hidden"}
                     </span>
                   </div>
 
                   {isEnabled && (
                     <div className="space-y-2">
-                      {schedule[key].duties.map((Worship, idx) => (
+                      {schedule[key].duties.map((duty, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-xs">
-                          <span className="w-40 text-slate-600 font-medium truncate">{Worship.role}</span>
+                          <span className="w-40 text-slate-600 font-medium truncate">{duty.role}</span>
                           <input
                             type="text"
-                            value={Worship.assignedTo}
-                            onChange={(e) => handleUpdateWorship(key, idx, e.target.value)}
+                            value={duty.assignedTo}
+                            onChange={(e) => handleUpdateDuty(key, idx, e.target.value)}
                             className="flex-1 bg-white border border-slate-300 rounded-md px-2.5 py-1 text-xs focus:ring-2 focus:ring-blue-600 outline-none font-semibold text-slate-800"
                             placeholder="Assign member..."
                           />
@@ -438,7 +460,6 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* 2. TOP ALERT BANNER (SYNCED) */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-slate-800">Live Top Alert Announcement Banner</h2>
@@ -457,7 +478,6 @@ export default function AdminDashboard() {
           </form>
         </section>
 
-        {/* 3. REGISTERED MEMBERS DIRECTORY */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div>
             <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
@@ -513,7 +533,6 @@ export default function AdminDashboard() {
           )}
         </section>
 
-        {/* 4. POST EVENT WITH PHOTO */}
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-slate-800">Post Event or Highlight (With Photo)</h2>
           <form onSubmit={handleAddEvent} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

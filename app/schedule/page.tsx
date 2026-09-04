@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-interface ServiceWorship {
+interface ServiceDuty {
   role: string;
   assignedTo: string;
 }
@@ -12,7 +12,7 @@ interface ServiceSchedule {
   title: string;
   time: string;
   enabled: boolean;
-  duties: ServiceWorship[];
+  duties: ServiceDuty[];
 }
 
 interface WeekSchedule {
@@ -25,7 +25,7 @@ interface WeekSchedule {
 }
 
 const DEFAULT_SCHEDULE: WeekSchedule = {
-  dateRange: "This Week's Services",
+  dateRange: "Midweek Worship | September 9, 2026",
   midweek: {
     title: "Wednesday Prayer Meeting",
     time: "Wednesday - 6:30 PM",
@@ -39,7 +39,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   vespers: {
     title: "Friday Vesper Worship",
     time: "Friday - 6:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Song Leader", assignedTo: "Music Ministry" },
       { role: "Devotional Message", assignedTo: "Assigned Speaker" },
@@ -49,7 +49,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   sabbathSchool: {
     title: "Sabbath School",
     time: "Saturday - 8:30 AM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Superintendent", assignedTo: "SS Superintendent" },
       { role: "Song Leader / Chorister", assignedTo: "Music Ministry" },
@@ -60,7 +60,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   divineWorship: {
     title: "Divine Worship Service",
     time: "Saturday - 10:30 AM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "Platform Elder", assignedTo: "First Elder" },
       { role: "Preacher / Speaker", assignedTo: "Church Pastor / Elder" },
@@ -72,7 +72,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
   ay: {
     title: "Adventist Youth (AY) Service",
     time: "Saturday - 3:30 PM",
-    enabled: true,
+    enabled: false,
     duties: [
       { role: "AY Program Leader", assignedTo: "AY Sponsor" },
       { role: "Song Service", assignedTo: "AY Praise Team" },
@@ -87,114 +87,109 @@ export default function SchedulePage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("church_Worship_schedule");
+    const saved = localStorage.getItem("church_duty_schedule");
     if (saved) {
       try {
-        setSchedule(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
       } catch (e) {}
     }
   }, []);
 
-  // Filter only enabled/visible services
-  const visibleServices = (
-    [
-      schedule.midweek,
-      schedule.vespers,
-      schedule.sabbathSchool,
-      schedule.divineWorship,
-      schedule.ay,
-    ] as ServiceSchedule[]
-  ).filter((s) => s.enabled !== false);
+  const serviceKeys = ["midweek", "vespers", "sabbathSchool", "divineWorship", "ay"] as const;
+  const activeServices = serviceKeys.filter((key) => schedule[key]?.enabled === true);
 
-  const copyToMessenger = () => {
-    const formatSection = (sec: ServiceSchedule) => {
-      const list = sec.duties.map((d) => `• ${d.role}: ${d.assignedTo}`).join("\n");
-      return `📌 *${sec.title}* (${sec.time})\n${list}`;
-    };
+  const handleCopy = () => {
+    let text = `✝ Tubod Seventh-day Adventist Church\n📅 ${schedule.dateRange}\n\n`;
 
-    const text = `⛪ *TUBOD SDA CHURCH - Worship Schedule*\n🗓️ ${schedule.dateRange}\n\n` +
-      visibleServices.map(formatSection).join("\n\n") +
-      `\n\n"Whatever your hand finds to do, do it with all your might." - Ecclesiastes 9:10`;
+    activeServices.forEach((key) => {
+      const s = schedule[key];
+      text += `--- ${s.title.toUpperCase()} (${s.time}) ---\n`;
+      s.duties.forEach((d) => {
+        text += `• ${d.role}: ${d.assignedTo}\n`;
+      });
+      text += `\n`;
+    });
 
+    text += `Please check your assignments. God bless! 🙏`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="text-base sm:text-lg font-extrabold text-blue-800 tracking-tight">
-            Tubod Seventh-day Adventist Church
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 selection:bg-blue-100">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+          <Link href="/" className="font-extrabold text-blue-900 text-sm sm:text-base flex items-center gap-2">
+            <span>✝</span> Tubod Seventh-day Adventist Church
           </Link>
           <div className="flex items-center gap-3">
             <button
-              onClick={copyToMessenger}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+              onClick={handleCopy}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5"
             >
-              {copied ? "✓ Copied to Clipboard!" : "📋 Copy for Messenger"}
+              <span>{copied ? "✓" : "📋"}</span>
+              <span>{copied ? "Copied!" : "Copy for Messenger"}</span>
             </button>
-            <Link
-              href="/"
-              className="text-xs font-semibold text-slate-600 hover:text-blue-800"
-            >
+            <Link href="/" className="text-xs font-semibold text-slate-600 hover:text-blue-700 transition-colors">
               Back to Home
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-10 w-full flex-1">
-        <div className="text-center mb-8 space-y-2">
-          <span className="text-xs font-bold text-blue-700 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+      <main className="max-w-5xl mx-auto px-4 pt-10">
+        <div className="text-center space-y-2 mb-8">
+          <span className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-800 font-bold text-[11px] tracking-wider uppercase">
             Worship Participation & Officers
           </span>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Church Worship Schedule
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-900">
+            {schedule.dateRange || "Church Worship Schedule"}
           </h1>
-          <p className="text-sm font-semibold text-slate-500">{schedule.dateRange}</p>
+          <p className="text-xs sm:text-sm text-slate-500">
+            Assigned roles and duty roster for this service
+          </p>
         </div>
 
-        {visibleServices.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8">
-            <p className="text-slate-500 font-medium">No Worship schedules are currently published for this period.</p>
-            <p className="text-xs text-slate-400 mt-1">Check back soon or ask your church elders for assignments.</p>
+        {activeServices.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center max-w-md mx-auto shadow-xs">
+            <span className="text-3xl">🗓️</span>
+            <h3 className="font-bold text-slate-800 mt-2">No Service Currently Active</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              The church administrator has not enabled a duty schedule for this day yet.
+            </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {visibleServices.map((srv, idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col"
-              >
-                <div className="bg-slate-900 text-white px-5 py-3 flex items-center justify-between">
-                  <h2 className="font-bold text-sm tracking-wide">{srv.title}</h2>
-                  <span className="text-xs text-blue-300">{srv.time}</span>
+          <div className={`grid gap-6 ${activeServices.length === 1 ? "max-w-2xl mx-auto" : "md:grid-cols-2"}`}>
+            {activeServices.map((key) => {
+              const item = schedule[key];
+              return (
+                <div
+                  key={key}
+                  className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden flex flex-col"
+                >
+                  <div className="bg-slate-950 text-white px-5 py-3.5 flex justify-between items-center">
+                    <h2 className="font-bold text-sm tracking-wide">{item.title}</h2>
+                    <span className="text-xs text-blue-300 font-semibold">{item.time}</span>
+                  </div>
+
+                  <div className="p-5 divide-y divide-slate-100 flex-1 flex flex-col justify-around text-xs sm:text-sm">
+                    {item.duties.map((duty, idx) => (
+                      <div key={idx} className="py-2.5 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                        <span className="text-slate-600 font-medium">{duty.role}</span>
+                        <span className="font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200/60 text-right">
+                          {duty.assignedTo || "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="p-5 divide-y divide-slate-100 flex-1">
-                  {srv.duties.map((Worship, dIdx) => (
-                    <div key={dIdx} className="py-2.5 flex justify-between items-center text-xs sm:text-sm">
-                      <span className="text-slate-600 font-medium">{Worship.role}</span>
-                      <span className="font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md text-right">
-                        {Worship.assignedTo}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-
-        <div className="mt-8 text-center text-xs text-slate-500">
-          Scheduled participants unable to fulfill their Worship are requested to inform the head deacon or elder in advance.
-        </div>
       </main>
-
-      <footer className="mt-auto bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-        <p>&copy; {new Date().getFullYear()} Tubod Seventh-day Adventist Church</p>
-      </footer>
     </div>
   );
 }
