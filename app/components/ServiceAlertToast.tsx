@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface ServiceDuty {
   role: string;
@@ -25,81 +26,93 @@ interface WeekSchedule {
 }
 
 export default function ServiceAlertToast() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [scheduleTitle, setScheduleTitle] = useState("");
   const [statusBadge, setStatusBadge] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
 
   useEffect(() => {
-    const savedSchedule = localStorage.getItem("church_duty_schedule");
-    if (!savedSchedule) return;
+    const checkSchedule = () => {
+      const savedSchedule = localStorage.getItem("church_duty_schedule");
+      if (!savedSchedule) {
+        setVisible(false);
+        return;
+      }
 
-    try {
-      const schedule: WeekSchedule = JSON.parse(savedSchedule);
-      const header = schedule.dateRange; // e.g. "Midweek Worship | September 9, 2026"
+      try {
+        const schedule: WeekSchedule = JSON.parse(savedSchedule);
 
-      setScheduleTitle(header);
+        const serviceKeys = ["midweek", "vespers", "sabbathSchool", "divineWorship", "ay"] as const;
+        const hasActiveService = serviceKeys.some((k) => schedule[k]?.enabled === true);
 
-      // Extract the date portion after the pipe "|"
-      const datePart = header.includes("|") ? header.split("|")[1].trim() : header;
-      const targetDate = new Date(datePart);
-
-      if (!isNaN(targetDate.getTime())) {
-        const now = new Date();
-
-        // Calculate end of the scheduled event day (11:59:59 PM)
-        const endOfDay = new Date(targetDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        // Check if the scheduled day has completely ended
-        if (now.getTime() > endOfDay.getTime()) {
-          // The program/day is finished, hide the schedule alert
+        // Hide if no services are active or header was wiped
+        if (!hasActiveService || !schedule.dateRange) {
           setVisible(false);
           return;
         }
 
-        // Compare calendar days
-        const isSameDay =
-          now.getFullYear() === targetDate.getFullYear() &&
-          now.getMonth() === targetDate.getMonth() &&
-          now.getDate() === targetDate.getDate();
+        const header = schedule.dateRange;
+        setScheduleTitle(header);
 
-        const diffHours = (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const datePart = header.includes("|") ? header.split("|")[1].trim() : header;
+        const targetDate = new Date(datePart);
 
-        if (isSameDay) {
-          setStatusBadge("🔴 Happening Today!");
-          setIsUrgent(true);
-          setVisible(true);
-        } else if (diffHours > 0 && diffHours <= 24) {
-          setStatusBadge("⚡ Tomorrow / In < 24 Hours");
-          setIsUrgent(true);
-          setVisible(true);
-        } else if (diffHours > 24 && diffHours <= 72) {
-          const days = Math.ceil(diffHours / 24);
-          setStatusBadge(`⏳ In ${days} Days`);
-          setIsUrgent(false);
-          setVisible(true);
+        if (!isNaN(targetDate.getTime())) {
+          const now = new Date();
+          const endOfDay = new Date(targetDate);
+          endOfDay.setHours(23, 59, 59, 999);
+
+          // Day passed
+          if (now.getTime() > endOfDay.getTime()) {
+            setVisible(false);
+            return;
+          }
+
+          const isSameDay =
+            now.getFullYear() === targetDate.getFullYear() &&
+            now.getMonth() === targetDate.getMonth() &&
+            now.getDate() === targetDate.getDate();
+
+          const diffHours = (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+          if (isSameDay) {
+            setStatusBadge("🔴 Happening Today!");
+            setIsUrgent(true);
+            setVisible(true);
+          } else if (diffHours > 0 && diffHours <= 24) {
+            setStatusBadge("⚡ Tomorrow / In < 24 Hours");
+            setIsUrgent(true);
+            setVisible(true);
+          } else if (diffHours > 24 && diffHours <= 72) {
+            const days = Math.ceil(diffHours / 24);
+            setStatusBadge(`⏳ In ${days} Days`);
+            setIsUrgent(false);
+            setVisible(true);
+          } else {
+            setStatusBadge("🗓️ Upcoming Service");
+            setIsUrgent(false);
+            setVisible(true);
+          }
         } else {
-          setStatusBadge("🗓️ Upcoming Service");
-          setIsUrgent(false);
+          setStatusBadge("🗓️ Active Duty Schedule");
           setVisible(true);
         }
-      } else {
-        // Fallback for custom labels without standard date formatting
-        setStatusBadge("🗓️ Active Duty Schedule");
-        setVisible(true);
+      } catch (e) {
+        setVisible(false);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
+    };
 
-  if (!visible) return null;
+    checkSchedule();
+  }, [pathname]);
+
+  // NEVER show the alert badge while the admin is working or viewing /schedule
+  if (!visible || pathname === "/schedule" || pathname === "/admin") return null;
 
   return (
     <aside
       aria-label="Upcoming worship service reminder"
-      className="fixed bottom-5 right-5 z-50 max-w-sm w-[90vw] sm:w-80 transition-all duration-300 transform translate-y-0"
+      className="fixed bottom-5 right-5 z-50 max-w-sm w-[90vw] sm:w-80 transition-all duration-300"
     >
       <div
         className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex flex-col gap-2 ${
