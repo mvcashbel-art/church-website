@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ChangeEvent } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -23,9 +23,21 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [department, setDepartment] = useState("Regular Church Member");
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const handlePhotoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +56,8 @@ export default function RegisterPage() {
           phone,
           address,
           department,
-          status: "pending", // Explicitly marks new registrations as pending for admin review
+          image: imagePreview || "",
+          status: "pending",
           registeredAt: new Date().toISOString(),
         },
       ]);
@@ -91,6 +104,7 @@ export default function RegisterPage() {
                   setFullName("");
                   setPhone("");
                   setAddress("");
+                  setImagePreview("");
                 }}
                 className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-lg text-xs transition"
               >
@@ -184,6 +198,21 @@ export default function RegisterPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Profile Photo (Optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="w-full text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+              {imagePreview && (
+                <div className="mt-3 relative w-24 h-24 rounded-full overflow-hidden border border-slate-200">
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
 
             <button
