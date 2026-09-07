@@ -19,6 +19,7 @@ interface Member {
   address: string;
   registeredAt: string;
   department?: string;
+  status?: string; // Added to support pending vs approved status
 }
 
 interface ServiceDuty {
@@ -202,6 +203,14 @@ export default function AdminDashboard() {
     await supabase.from("events").delete().eq("id", id);
   };
 
+  const handleApproveMember = async (memberId: number) => {
+    const updated = members.map((m) =>
+      m.id === memberId ? { ...m, status: "approved" } : m
+    );
+    setMembers(updated);
+    await supabase.from("members").update({ status: "approved" }).eq("id", memberId);
+  };
+
   const handleDepartmentChange = async (memberId: number, newDept: string) => {
     const updated = members.map((m) =>
       m.id === memberId ? { ...m, department: newDept } : m
@@ -322,6 +331,9 @@ export default function AdminDashboard() {
       </div>
     );
   }
+
+  const pendingMembers = members.filter((m) => m.status === "pending" || !m.status);
+  const approvedMembers = members.filter((m) => m.status === "approved");
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -483,9 +495,57 @@ export default function AdminDashboard() {
           </form>
         </section>
 
+        {/* Pending Membership Approvals Section */}
+        <section className="bg-white p-6 rounded-xl border border-amber-200 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-amber-900">Pending Membership Approvals ({pendingMembers.length})</h2>
+            <p className="text-xs text-slate-500">Review newly registered members awaiting approval into the church directory.</p>
+          </div>
+
+          {pendingMembers.length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No pending member registrations.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-amber-50 text-amber-900 font-semibold border-b border-amber-200">
+                  <tr>
+                    <th className="p-3">Full Name</th>
+                    <th className="p-3">Contact</th>
+                    <th className="p-3">Address</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingMembers.map((m) => (
+                    <tr key={m.id} className="hover:bg-amber-50/50">
+                      <td className="p-3 font-semibold text-slate-900">{m.fullName}</td>
+                      <td className="p-3">{m.phone}</td>
+                      <td className="p-3">{m.address}</td>
+                      <td className="p-3 text-right space-x-2">
+                        <button
+                          onClick={() => handleApproveMember(m.id)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-medium"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMember(m.id)}
+                          className="text-rose-600 hover:underline font-medium"
+                        >
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div>
-            <h2 className="text-base font-bold text-slate-800">Registered Church Directory ({members.length})</h2>
+            <h2 className="text-base font-bold text-slate-800">Approved Church Directory ({members.length})</h2>
             <p className="text-xs text-slate-500">Assign ministry roles or remove records.</p>
           </div>
 
