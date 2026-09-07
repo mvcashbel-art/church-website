@@ -4,22 +4,12 @@ import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-export interface ScheduledServiceItem {
-  id: string;
-  serviceType: string;
-  title: string;
-  time: string;
-  date: string;
-  duties: { role: string; assignedTo: string }[];
-}
-
 interface ChurchEvent {
   id: number;
   title: string;
   date: string;
   desc: string;
-  mediaUrl?: string; // Can be a local compressed base64 or Google Drive link
-  videoUrl?: string;
+  image?: string;
 }
 
 interface Member {
@@ -29,8 +19,6 @@ interface Member {
   address: string;
   registeredAt: string;
   department?: string;
-  photoUrl?: string;
-  status?: "pending" | "approved";
 }
 
 interface ServiceDuty {
@@ -123,46 +111,38 @@ const DEPARTMENTS = [
   "Music & Choir",
   "Health Ministries",
   "Communications & Media",
-  "Church Elder / Board",
+  "Church Elder / Board"
 ];
 
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"schedules" | "events" | "members" | "banner">("events");
 
-  const [schedules, setSchedules] = useState<ScheduledServiceItem[]>([]);
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [bannerNotice, setBannerNotice] = useState("");
+  const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
 
   const [selectedServiceType, setSelectedServiceType] = useState("Midweek Worship");
   const [selectedDate, setSelectedDate] = useState("");
 
-  // Event form state
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventDate, setEventDate] = useState("");
-  const [eventDesc, setEventDesc] = useState("");
-  const [mediaUrl, setMediaUrl] = useState(""); // Google Drive link fallback
-  const [videoUrl, setVideoUrl] = useState("");
-  const [eventPhotoPreview, setEventPhotoPreview] = useState(""); // Local uploaded photo
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [desc, setDesc] = useState("");
+  const [imagePreview, setImagePreview] = useState<string>("");
 
   useEffect(() => {
     async function fetchCloudData() {
-      // 1. Fetch Events
       const { data: eventsData } = await supabase.from("events").select("*").order("id", { ascending: false });
       if (eventsData) setEvents(eventsData);
 
-      // 2. Fetch Members
       const { data: membersData } = await supabase.from("members").select("*").order("id", { ascending: false });
       if (membersData) setMembers(membersData);
 
-      // 3. Fetch Banner
       const { data: bannerData } = await supabase.from("banner").select("*").limit(1).single();
       if (bannerData && bannerData.text) setBannerNotice(bannerData.text);
 
-      // 4. Fetch Schedule
       const { data: schedData } = await supabase.from("schedules").select("*").eq("id", "current_week").single();
       if (schedData && schedData.duties) {
         setSchedule({ ...DEFAULT_SCHEDULE, ...schedData.duties });
@@ -182,78 +162,38 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleTypeChange = (newType: string) => {
-    setChosenType(newType);
-    setServiceDuties(SERVICE_TEMPLATES[newType].roles.map((r) => ({ role: r, assignedTo: "" })));
-  };
-
-  // Compress uploaded 4K device photos for events
-  const handleEventPhotoSelect = (e: ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_SIZE = 900; // Crisp web resolution
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height = Math.round((height * MAX_SIZE) / width);
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width = Math.round((width * MAX_SIZE) / height);
-            height = MAX_SIZE;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL("image/jpeg", 0.8);
-          setEventPhotoPreview(compressed);
-        }
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
       };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventTitle || !eventDesc) return;
+    if (!title || !desc) return;
 
     const newEvent: ChurchEvent = {
       id: Date.now(),
-      title: eventTitle,
-      date: eventDate || "Upcoming",
-      desc: eventDesc,
-      mediaUrl: eventPhotoPreview || mediaUrl.trim(), // Prioritize uploaded device photo
-      videoUrl: videoUrl.trim(),
+      title,
+      date: date || "Upcoming",
+      desc,
+      image: imagePreview || "",
     };
 
     const updated = [newEvent, ...events];
     setEvents(updated);
 
-    // Save to Supabase
     await supabase.from("events").upsert([newEvent]);
 
-    broadcastDataChange();
-    setEventTitle("");
-    setEventDate("");
-    setEventDesc("");
-    setMediaUrl("");
-    setVideoUrl("");
-    setEventPhotoPreview("");
-    alert("Event published live on homepage!");
+    setTitle("");
+    setDate("");
+    setDesc("");
+    setImagePreview("");
   };
 
   const handleDeleteEvent = async (id: number) => {
@@ -351,12 +291,9 @@ export default function AdminDashboard() {
     alert("Top alert banner updated globally!");
   };
 
-  const pendingMembers = members.filter((m) => m.status === "pending");
-  const approvedMembers = members.filter((m) => m.status !== "pending");
-
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <form onSubmit={handleLogin} className="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full space-y-4">
           <div className="text-center">
             <span className="text-3xl">🔐</span>
@@ -387,20 +324,20 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-16">
-      <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <span className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded font-bold uppercase tracking-wider">Admin</span>
           <h1 className="text-lg font-bold">Tubod SDA Church Manager (Cloud-Synced)</h1>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <Link href="/schedule" className="bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded font-semibold hidden sm:inline-block">
-            View Schedule &rarr;
+        <div className="flex items-center gap-4 text-sm">
+          <Link href="/schedule" className="bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded transition text-xs font-semibold">
+            View Public Roster &rarr;
           </Link>
-          <Link href="/" className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded">
+          <Link href="/" className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded transition text-xs">
             Live Site
           </Link>
-          <button onClick={() => setIsAuthenticated(false)} className="text-rose-400 hover:underline">
+          <button onClick={() => setIsAuthenticated(false)} className="text-xs text-rose-400 hover:underline">
             Lock
           </button>
         </div>
@@ -492,15 +429,10 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between mb-3 border-b pb-2 border-slate-200">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
-                        type="text"
-                        placeholder="Name..."
-                        value={d.assignedTo}
-                        onChange={(e) => {
-                          const updated = [...serviceDuties];
-                          updated[index].assignedTo = e.target.value;
-                          setServiceDuties(updated);
-                        }}
-                        className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-xs outline-none"
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => handleToggleService(key)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                       />
                       <span className="font-bold text-xs uppercase tracking-wider text-slate-800">
                         {label}
@@ -528,6 +460,10 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
+              );
+            })}
+          </div>
+        </section>
 
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
@@ -553,50 +489,48 @@ export default function AdminDashboard() {
             <p className="text-xs text-slate-500">Assign ministry roles or remove records.</p>
           </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Description *</label>
-                  <textarea
-                    required
-                    rows={3}
-                    placeholder="Event summary..."
-                    value={eventDesc}
-                    onChange={(e) => setEventDesc(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
-
-                <div>
-                  <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-2.5 rounded-xl shadow-xs transition">
-                    + Publish Event (Live on Home)
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <h2 className="text-sm font-bold text-slate-900">Active Events ({events.length})</h2>
-              {events.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-500">
-                  No events posted yet.
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {events.map((ev) => (
-                    <div key={ev.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
-                      <div>
-                        <span className="text-[10px] font-bold text-blue-600 uppercase">{ev.date}</span>
-                        <h4 className="text-sm font-bold text-slate-900 mt-0.5 truncate">{ev.title}</h4>
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{ev.desc}</p>
-                      </div>
-                      <div className="pt-3 mt-3 border-t border-slate-200 flex justify-end">
-                        <button
-                          onClick={() => handleDeleteEvent(ev.id)}
-                          className="text-xs text-rose-600 hover:bg-rose-50 border border-rose-200 px-3 py-1 rounded-md font-semibold"
+          {members.length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No registered members yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700">
+                <thead className="bg-slate-50 text-slate-900 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">Full Name</th>
+                    <th className="p-3">Contact</th>
+                    <th className="p-3">Address</th>
+                    <th className="p-3">Ministry Role</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {members.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-semibold text-slate-900">{m.fullName}</td>
+                      <td className="p-3">{m.phone}</td>
+                      <td className="p-3">{m.address}</td>
+                      <td className="p-3">
+                        <select
+                          value={m.department || "Regular Church Member"}
+                          onChange={(e) => handleDepartmentChange(m.id, e.target.value)}
+                          className="bg-white border border-slate-300 text-slate-800 text-xs rounded-md px-2 py-1.5 focus:ring-2 focus:ring-blue-600 outline-none font-medium"
                         >
-                          Delete
+                          {DEPARTMENTS.map((dept) => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleDeleteMember(m.id)}
+                          className="text-rose-600 hover:underline font-medium"
+                        >
+                          Remove
                         </button>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -643,96 +577,17 @@ export default function AdminDashboard() {
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
-            </section>
-          </div>
-        )}
+            </div>
 
-        {/* TAB 3: MEMBERS */}
-        {activeTab === "members" && (
-          <div className="space-y-6">
-            {pendingMembers.length > 0 && (
-              <section className="bg-amber-50/70 border border-amber-200 rounded-2xl p-6 shadow-sm space-y-4">
-                <h2 className="text-sm font-bold text-amber-950">⏳ Pending Review Queue ({pendingMembers.length})</h2>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {pendingMembers.map((m) => (
-                    <div key={m.id} className="bg-white p-4 rounded-xl border border-amber-200 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                          {m.photoUrl ? <img src={m.photoUrl} alt="" className="w-full h-full object-cover" /> : "👤"}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs text-slate-900">{m.fullName}</h4>
-                          <p className="text-[11px] text-slate-500">{m.phone} • {m.department}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => handleDeclineMember(m.id)} className="text-xs text-rose-600 px-2.5 py-1 rounded border border-rose-200">Decline</button>
-                        <button onClick={() => handleApproveMember(m.id)} className="text-xs bg-emerald-600 text-white font-bold px-3 py-1 rounded">Approve</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <h2 className="text-sm font-bold text-slate-900">Approved Directory ({approvedMembers.length})</h2>
-              {approvedMembers.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50 border border-dashed rounded-xl text-xs text-slate-500">No approved members.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-slate-700">
-                    <thead className="bg-slate-50 border-b">
-                      <tr>
-                        <th className="p-3">Member</th>
-                        <th className="p-3">Contact</th>
-                        <th className="p-3">Role</th>
-                        <th className="p-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {approvedMembers.map((m) => (
-                        <tr key={m.id} className="hover:bg-slate-50">
-                          <td className="p-3 font-semibold flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                              {m.photoUrl ? <img src={m.photoUrl} alt="" className="w-full h-full object-cover" /> : "👤"}
-                            </div>
-                            {m.fullName}
-                          </td>
-                          <td className="p-3">{m.phone}</td>
-                          <td className="p-3">
-                            <select
-                              value={m.department || "Regular Church Member"}
-                              onChange={(e) => handleDepartmentChange(m.id, e.target.value)}
-                              className="bg-white border rounded px-2 py-1 text-xs"
-                            >
-                              {DEPARTMENTS.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
-                            </select>
-                          </td>
-                          <td className="p-3 text-right">
-                            <button onClick={() => handleDeleteMember(m.id)} className="text-rose-600 hover:underline">Remove</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          </div>
-        )}
-
-        {/* TAB 4: BANNER */}
-        {activeTab === "banner" && (
-          <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h2 className="text-sm font-bold text-slate-900">Live Top Alert Banner</h2>
-            <form onSubmit={handleUpdateBanner} className="space-y-3 text-xs">
-              <input
-                type="text"
-                placeholder="Announcement notice..."
-                value={bannerNotice}
-                onChange={(e) => setBannerNotice(e.target.value)}
-                className="w-full bg-slate-50 border rounded-lg p-2.5 outline-none"
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Details *</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Event description..."
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-700 outline-none text-xs"
               />
             </div>
 
