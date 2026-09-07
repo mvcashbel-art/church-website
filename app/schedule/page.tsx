@@ -84,7 +84,7 @@ const DEFAULT_SCHEDULE: WeekSchedule = {
 };
 
 export default function SchedulePage() {
-  const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
+  const [services, setServices] = useState<ScheduledServiceItem[]>([]);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {

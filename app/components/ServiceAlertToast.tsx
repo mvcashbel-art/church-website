@@ -4,25 +4,22 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface ServiceDuty {
-  role: string;
-  assignedTo: string;
-}
-
-interface ServiceSchedule {
+interface ScheduledServiceItem {
+  id: string;
+  serviceType: string;
   title: string;
   time: string;
-  enabled: boolean;
-  duties: ServiceDuty[];
+  date: string;
+  duties: { role: string; assignedTo: string }[];
 }
 
-interface WeekSchedule {
-  dateRange: string;
-  midweek: ServiceSchedule;
-  vespers: ServiceSchedule;
-  sabbathSchool: ServiceSchedule;
-  divineWorship: ServiceSchedule;
-  ay: ServiceSchedule;
+interface AlertItem {
+  id: string;
+  serviceType: string;
+  time: string;
+  date: string;
+  badgeText: string;
+  isUrgent: boolean;
 }
 
 export default function ServiceAlertToast() {
@@ -40,7 +37,10 @@ export default function ServiceAlertToast() {
       const schedule: WeekSchedule = JSON.parse(savedSchedule);
       const header = schedule.dateRange;
 
-      setScheduleTitle(header);
+        valid.forEach((item) => {
+          const target = new Date(item.date);
+          const diffMs = target.getTime() - now.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
 
       const datePart = header.includes("|") ? header.split("|")[1].trim() : header;
       const targetDate = new Date(datePart);
@@ -88,14 +88,13 @@ export default function ServiceAlertToast() {
     } catch (e) {
       console.error(e);
     }
-  }, []);
 
   if (!visible || pathname === "/schedule") return null;
 
   return (
     <aside
-      aria-label="Upcoming worship service reminder"
-      className="fixed bottom-5 right-5 z-50 max-w-sm w-[90vw] sm:w-80 transition-all duration-300 transform translate-y-0"
+      aria-label="Upcoming worship services"
+      className="fixed bottom-5 right-5 z-50 max-w-sm w-[92vw] sm:w-80 transition-all duration-300 select-none"
     >
       <div
         className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex flex-col gap-2 ${
@@ -131,26 +130,26 @@ export default function ServiceAlertToast() {
             {scheduleTitle || "Active Worship Service"}
           </h4>
           <p
-            className={`text-xs mt-1 leading-relaxed ${
-              isUrgent ? "text-slate-900 font-medium" : "text-slate-300"
+            className={`text-xs mt-0.5 leading-snug truncate ${
+              current.isUrgent ? "text-slate-950 font-semibold" : "text-slate-300"
             }`}
           >
             Active schedule roster. Please review duty assignments.
           </p>
         </div>
 
-        <div className="pt-2 flex items-center justify-between border-t border-black/10 mt-1">
+        <div className="pt-2 flex items-center justify-between border-t border-black/10 mt-0.5">
           <Link
             href="/schedule"
-            className={`text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 ${
-              isUrgent
+            className={`text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all ${
+              current.isUrgent
                 ? "bg-slate-950 text-white hover:bg-slate-800"
                 : "bg-blue-600 text-white hover:bg-blue-500"
             }`}
           >
             View Duty Roster &rarr;
           </Link>
-          <span className="text-[10px] opacity-75">Tubod SDA</span>
+          <span className="text-[10px] opacity-70 font-medium">Tubod SDA</span>
         </div>
       </div>
     </aside>
