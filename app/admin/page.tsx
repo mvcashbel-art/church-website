@@ -2,6 +2,7 @@
 
 import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 interface ChurchEvent {
   id: number;
@@ -132,22 +133,27 @@ export default function AdminDashboard() {
   const [imagePreview, setImagePreview] = useState<string>("");
 
   useEffect(() => {
-    const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents) setEvents(JSON.parse(savedEvents));
+    async function fetchCloudData() {
+      // 1. Fetch Events
+      const { data: eventsData } = await supabase.from("events").select("*").order("id", { ascending: false });
+      if (eventsData) setEvents(eventsData);
 
-    const savedMembers = localStorage.getItem("church_members");
-    if (savedMembers) setMembers(JSON.parse(savedMembers));
+      // 2. Fetch Members
+      const { data: membersData } = await supabase.from("members").select("*").order("id", { ascending: false });
+      if (membersData) setMembers(membersData);
 
-    const savedBanner = localStorage.getItem("church_banner");
-    if (savedBanner) setBannerNotice(savedBanner);
+      // 3. Fetch Banner
+      const { data: bannerData } = await supabase.from("banner").select("*").limit(1).single();
+      if (bannerData && bannerData.text) setBannerNotice(bannerData.text);
 
-    const savedSchedule = localStorage.getItem("church_duty_schedule");
-    if (savedSchedule) {
-      try {
-        const parsed = JSON.parse(savedSchedule);
-        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
-      } catch (e) {}
+      // 4. Fetch Schedule
+      const { data: schedData } = await supabase.from("schedules").select("*").eq("id", "current_week").single();
+      if (schedData && schedData.duties) {
+        setSchedule({ ...DEFAULT_SCHEDULE, ...schedData.duties });
+      }
     }
+
+    fetchCloudData();
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -171,7 +177,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !desc) return;
 
@@ -185,7 +191,9 @@ export default function AdminDashboard() {
 
     const updated = [newEvent, ...events];
     setEvents(updated);
-    localStorage.setItem("church_events", JSON.stringify(updated));
+
+    // Save to Supabase
+    await supabase.from("events").upsert([newEvent]);
 
     setTitle("");
     setDate("");
@@ -193,24 +201,24 @@ export default function AdminDashboard() {
     setImagePreview("");
   };
 
-  const handleDeleteEvent = (id: number) => {
+  const handleDeleteEvent = async (id: number) => {
     const updated = events.filter((item) => item.id !== id);
     setEvents(updated);
-    localStorage.setItem("church_events", JSON.stringify(updated));
+    await supabase.from("events").delete().eq("id", id);
   };
 
-  const handleDepartmentChange = (memberId: number, newDept: string) => {
+  const handleDepartmentChange = async (memberId: number, newDept: string) => {
     const updated = members.map((m) =>
       m.id === memberId ? { ...m, department: newDept } : m
     );
     setMembers(updated);
-    localStorage.setItem("church_members", JSON.stringify(updated));
+    await supabase.from("members").update({ department: newDept }).eq("id", memberId);
   };
 
-  const handleDeleteMember = (id: number) => {
+  const handleDeleteMember = async (id: number) => {
     const updated = members.filter((m) => m.id !== id);
     setMembers(updated);
-    localStorage.setItem("church_members", JSON.stringify(updated));
+    await supabase.from("members").delete().eq("id", id);
   };
 
   const handleToggleService = (serviceKey: keyof Omit<WeekSchedule, "dateRange">) => {
@@ -229,7 +237,7 @@ export default function AdminDashboard() {
     setSchedule(updated);
   };
 
-  const applyPresetServices = (serviceType: string, chosenDate: string) => {
+  const applyPresetServices = async (serviceType: string, chosenDate: string) => {
     const updated: WeekSchedule = { ...schedule };
 
     updated.midweek.enabled = false;
@@ -256,6 +264,7 @@ export default function AdminDashboard() {
       updated.ay.enabled = true;
     }
 
+    let newBannerText = bannerNotice;
     if (chosenDate) {
       const parsedDate = new Date(chosenDate);
       const formatted = parsedDate.toLocaleDateString("en-US", {
@@ -264,26 +273,27 @@ export default function AdminDashboard() {
         year: "numeric",
       });
       const newHeader = `${serviceType} | ${formatted}`;
-      const autoBanner = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
+      newBannerText = `📢 Upcoming: ${newHeader} - Please check the duty roster for your assignments!`;
       updated.dateRange = newHeader;
-      setBannerNotice(autoBanner);
-      localStorage.setItem("church_banner", autoBanner);
+      setBannerNotice(newBannerText);
+      
+      await supabase.from("banner").upsert([{ id: 1, text: newBannerText }]);
     }
 
     setSchedule(updated);
-    localStorage.setItem("church_duty_schedule", JSON.stringify(updated));
+    await supabase.from("schedules").upsert([{ id: "current_week", duties: updated }]);
   };
 
-  const handleSaveSchedule = (e: React.FormEvent) => {
+  const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("church_duty_schedule", JSON.stringify(schedule));
-    alert("Saved! Unselected services are now completely hidden on the public schedule page.");
+    await supabase.from("schedules").upsert([{ id: "current_week", duties: schedule }]);
+    alert("Saved to cloud! All users across any device will now see the updated schedule instantly.");
   };
 
-  const handleUpdateBanner = (e: React.FormEvent) => {
+  const handleUpdateBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("church_banner", bannerNotice);
-    alert("Top alert banner updated!");
+    await supabase.from("banner").upsert([{ id: 1, text: bannerNotice }]);
+    alert("Top alert banner updated globally!");
   };
 
   if (!isAuthenticated) {
@@ -323,7 +333,7 @@ export default function AdminDashboard() {
       <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <span className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded font-bold uppercase tracking-wider">Admin</span>
-          <h1 className="text-lg font-bold">Tubod SDA Church Manager</h1>
+          <h1 className="text-lg font-bold">Tubod SDA Church Manager (Cloud-Synced)</h1>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/schedule" className="bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded transition text-xs font-semibold">
@@ -344,7 +354,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="text-lg font-bold text-slate-900">Worship Duty Scheduler & Date Settings</h2>
               <p className="text-xs text-slate-500">
-                Selecting a service automatically enables only its matching duties and hides all other days.
+                Selecting a service automatically enables only its matching duties and updates the cloud database.
               </p>
             </div>
             <button
@@ -463,7 +473,7 @@ export default function AdminDashboard() {
         <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-slate-800">Live Top Alert Announcement Banner</h2>
-            <span className="text-xs text-slate-400">Shows across every page</span>
+            <span className="text-xs text-slate-400">Shows across every page globally</span>
           </div>
           <form onSubmit={handleUpdateBanner} className="flex gap-3">
             <input
@@ -588,7 +598,7 @@ export default function AdminDashboard() {
 
             <div>
               <button type="submit" className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2 rounded-lg text-xs shadow">
-                + Publish Event & Photo
+                + Publish Event & Photo to Cloud
               </button>
             </div>
           </form>

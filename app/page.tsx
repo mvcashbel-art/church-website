@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 interface ChurchEvent {
   id: number;
@@ -31,28 +32,41 @@ export default function ChurchHome() {
   const [banner, setBanner] = useState("📢 Happy Preparation Day! Sabbath worship begins tomorrow at 8:30 AM.");
 
   useEffect(() => {
-    const savedEvents = localStorage.getItem("church_events");
-    if (savedEvents) {
-      try {
-        const parsed = JSON.parse(savedEvents);
-        if (parsed.length > 0) setEvents(parsed);
-      } catch (e) {}
+    async function fetchHomeCloudData() {
+      // 1. Fetch Events from Supabase
+      const { data: eventsData, error: eventsError } = await supabase
+        .from("events")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (!eventsError && eventsData && eventsData.length > 0) {
+        setEvents(eventsData);
+      }
+
+      // 2. Fetch Banner from Supabase
+      const { data: bannerData, error: bannerError } = await supabase
+        .from("banner")
+        .select("*")
+        .limit(1)
+        .single();
+
+      if (!bannerError && bannerData && bannerData.text) {
+        setBanner(bannerData.text);
+      }
     }
-    const savedBanner = localStorage.getItem("church_banner");
-    if (savedBanner) {
-      setBanner(savedBanner);
-    }
+
+    fetchHomeCloudData();
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-blue-200 selection:text-blue-900">
       {/* 1. TOP ANNOUNCEMENT BANNER */}
-<div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
-  <span className="inline-flex items-center gap-2">
-    <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
-    {banner}
-  </span>
-</div>
+      <div className="bg-amber-400 border-b border-amber-500 text-amber-950 text-xs sm:text-sm font-bold py-2.5 px-4 text-center shadow-xs">
+        <span className="inline-flex items-center gap-2">
+          <span className="flex h-2.5 w-2.5 rounded-full bg-amber-950 animate-pulse"></span>
+          {banner}
+        </span>
+      </div>
 
       {/* 2. BRIGHT WHITE & BLUE HEADER */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm">

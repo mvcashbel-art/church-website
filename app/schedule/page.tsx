@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 interface ServiceDuty {
   role: string;
@@ -87,13 +88,19 @@ export default function SchedulePage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("church_duty_schedule");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSchedule({ ...DEFAULT_SCHEDULE, ...parsed });
-      } catch (e) {}
+    async function fetchScheduleFromCloud() {
+      const { data, error } = await supabase
+        .from("schedules")
+        .select("*")
+        .eq("id", "current_week")
+        .single();
+
+      if (!error && data && data.duties) {
+        setSchedule({ ...DEFAULT_SCHEDULE, ...data.duties });
+      }
     }
+
+    fetchScheduleFromCloud();
   }, []);
 
   const serviceKeys = ["midweek", "vespers", "sabbathSchool", "divineWorship", "ay"] as const;
